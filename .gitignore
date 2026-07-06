@@ -51,3 +51,6 @@ Thumbs.db
 # Generated Scaffolds (Ignore local tests)
 # Note: Add paths to your generated projects here if you don't want them tracked
 # app_test/
+
+# Audit / Planning files
+*audit.md
