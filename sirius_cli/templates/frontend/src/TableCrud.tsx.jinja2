@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useCallback } from 'react'
+import React, { useEffect, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus, Edit2, Trash2, X, ChevronLeft, ChevronRight, Loader2, Search, Download, ArrowUpDown, ArrowUp, ArrowDown, FileSpreadsheet } from 'lucide-react'
 
@@ -78,7 +78,7 @@ export default function {{ table_name.replace('_', ' ').title().replace(' ', '')
         params.set('order_by', sortCol)
         params.set('dir', sortDir)
       }
-      const res = await fetch(`${API_BASE}/api/{{ table_name }}?${params}`)
+      const res = await fetch(`${API_BASE}/api/{{ table_name }}?${params}`{% if auth %}, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }{% endif %})
       if (!res.ok) throw new Error('Failed to load data from server')
       const data = await res.json()
       setRecords(data)
@@ -99,7 +99,7 @@ export default function {{ table_name.replace('_', ' ').title().replace(' ', '')
     {% for col in columns %}
     {% if col.foreign_key %}
     {% set target_table = col.foreign_key.split('.')[0] %}
-    fetch(`${API_BASE}/api/{{ target_table }}?limit=500`)
+    fetch(`${API_BASE}/api/{{ target_table }}?limit=500`{% if auth %}, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }{% endif %})
       .then(res => {
         if (!res.ok) throw new Error(`Server responded ${res.status}`)
         return res.json()
@@ -182,7 +182,10 @@ export default function {{ table_name.replace('_', ' ').title().replace(' ', '')
 
       const res = await fetch(url, {
         method,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json'{% if auth %},
+          'Authorization': `Bearer ${localStorage.getItem('token')}`{% endif %}
+        },
         body: JSON.stringify(payload)
       })
 
@@ -200,7 +203,8 @@ export default function {{ table_name.replace('_', ' ').title().replace(' ', '')
   const handleDelete = async (id: number) => {
     try {
       const res = await fetch(`${API_BASE}/api/{{ table_name }}/${id}`, {
-        method: 'DELETE'
+        method: 'DELETE'{% if auth %},
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }{% endif %}
       })
       if (!res.ok) throw new Error('Failed to delete record')
       setDeleteConfirmId(null)
@@ -210,8 +214,28 @@ export default function {{ table_name.replace('_', ' ').title().replace(' ', '')
     }
   }
 
-  const handleExport = (fmt: 'csv' | 'xlsx') => {
+  const handleExport = async (fmt: 'csv' | 'xlsx') => {
+    {% if auth %}
+    try {
+      const res = await fetch(`${API_BASE}/api/{{ table_name }}/export?fmt=${fmt}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      })
+      if (!res.ok) throw new Error('Export failed')
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `{{ table_name }}.${fmt}`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (err: any) {
+      alert(err.message || 'Export failed')
+    }
+    {% else %}
     window.open(`${API_BASE}/api/{{ table_name }}/export?fmt=${fmt}`, '_blank')
+    {% endif %}
   }
 
   const handleSort = (colName: string) => {

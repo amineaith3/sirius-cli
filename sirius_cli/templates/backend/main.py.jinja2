@@ -7,8 +7,11 @@ from sqlalchemy import or_, cast, String as SAString, desc as sa_desc, asc as sa
 from sqlalchemy.orm import Session
 from typing import List, Optional
 
-from .database import engine, get_db
+from .database import engine, get_db, SessionLocal
 from . import models, schemas
+{% if auth %}
+from .auth import auth_router, get_current_user, seed_admin_user
+{% endif %}
 
 # Automatically create tables if they do not exist
 models.Base.metadata.create_all(bind=engine)
@@ -22,6 +25,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+{% if auth %}
+# Seed initial admin user if table is empty
+with SessionLocal() as db:
+    seed_admin_user(db)
+
+app.include_router(auth_router)
+{% endif %}
 
 @app.get("/")
 def read_root():
@@ -55,7 +66,8 @@ def list_{{ table_name }}(
     search: Optional[str] = Query(None, description="Search across all text columns"),
     order_by: Optional[str] = Query(None, description="Column name to sort by"),
     dir: Optional[str] = Query("asc", description="Sort direction: asc or desc"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db){% if auth %},
+    current_user = Depends(get_current_user){% endif %}
 ):
     query = db.query(models.{{ model_name }})
 
@@ -79,7 +91,8 @@ def list_{{ table_name }}(
 @app.get("/api/{{ table_name }}/export")
 def export_{{ table_name }}(
     fmt: Optional[str] = Query("csv", description="Export format: csv or xlsx"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db){% if auth %},
+    current_user = Depends(get_current_user){% endif %}
 ):
     records = db.query(models.{{ model_name }}).all()
     col_names = [c.name for c in models.{{ model_name }}.__table__.columns]
@@ -137,14 +150,14 @@ def export_{{ table_name }}(
     )
 
 @app.get("/api/{{ table_name }}/{id}", response_model=schemas.{{ schema_response }})
-def get_{{ table_name }}(id: int, db: Session = Depends(get_db)):
+def get_{{ table_name }}(id: int, db: Session = Depends(get_db){% if auth %}, current_user = Depends(get_current_user){% endif %}):
     record = db.query(models.{{ model_name }}).filter(models.{{ model_name }}.id == id).first()
     if not record:
         raise HTTPException(status_code=404, detail="Record not found in {{ table_name }}")
     return record
 
 @app.post("/api/{{ table_name }}", response_model=schemas.{{ schema_response }}, status_code=status.HTTP_201_CREATED)
-def create_{{ table_name }}(payload: schemas.{{ schema_create }}, db: Session = Depends(get_db)):
+def create_{{ table_name }}(payload: schemas.{{ schema_create }}, db: Session = Depends(get_db){% if auth %}, current_user = Depends(get_current_user){% endif %}):
     db_record = models.{{ model_name }}(**payload.model_dump())
     db.add(db_record)
     db.commit()
@@ -152,7 +165,7 @@ def create_{{ table_name }}(payload: schemas.{{ schema_create }}, db: Session = 
     return db_record
 
 @app.put("/api/{{ table_name }}/{id}", response_model=schemas.{{ schema_response }})
-def update_{{ table_name }}(id: int, payload: schemas.{{ schema_update }}, db: Session = Depends(get_db)):
+def update_{{ table_name }}(id: int, payload: schemas.{{ schema_update }}, db: Session = Depends(get_db){% if auth %}, current_user = Depends(get_current_user){% endif %}):
     db_record = db.query(models.{{ model_name }}).filter(models.{{ model_name }}.id == id).first()
     if not db_record:
         raise HTTPException(status_code=404, detail="Record not found in {{ table_name }}")
@@ -166,7 +179,7 @@ def update_{{ table_name }}(id: int, payload: schemas.{{ schema_update }}, db: S
     return db_record
 
 @app.delete("/api/{{ table_name }}/{id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_{{ table_name }}(id: int, db: Session = Depends(get_db)):
+def delete_{{ table_name }}(id: int, db: Session = Depends(get_db){% if auth %}, current_user = Depends(get_current_user){% endif %}):
     db_record = db.query(models.{{ model_name }}).filter(models.{{ model_name }}.id == id).first()
     if not db_record:
         raise HTTPException(status_code=404, detail="Record not found in {{ table_name }}")

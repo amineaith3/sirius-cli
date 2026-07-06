@@ -6,6 +6,11 @@ pydantic>=2.0.0
 pandas>=1.5.0
 openpyxl>=3.0.0
 email-validator>=2.0.0
+{% if auth %}
+passlib[bcrypt]>=1.7.4
+python-jose[cryptography]>=3.3.0
+python-multipart>=0.0.6
+{% endif %}
 {% if db_type == 'pg' %}
 psycopg2-binary>=2.9.0
 {% elif db_type == 'mysql' %}

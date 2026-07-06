@@ -2,6 +2,11 @@ import React from 'react'
 import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom'
 import { Database, Table, LayoutDashboard, ChevronRight } from 'lucide-react'
 import Dashboard from './Dashboard'
+{% if auth %}
+import { useState } from 'react'
+import Login from './pages/Login'
+import { LogOut } from 'lucide-react'
+{% endif %}
 {% for table_name, columns in schemas.items() %}
 import {{ table_name.replace('_', ' ').title().replace(' ', '') }}Crud from './pages/{{ table_name.replace('_', ' ').title().replace(' ', '') }}Crud'
 {% endfor %}
@@ -26,6 +31,23 @@ const SidebarLink = ({ to, children, icon: Icon }: { to: string; children: React
 }
 
 function AppContent() {
+{% if auth %}
+  const [token, setToken] = useState<string | null>(localStorage.getItem('token'))
+
+  const handleLogin = (newToken: string) => {
+    localStorage.setItem('token', newToken)
+    setToken(newToken)
+  }
+
+  const handleLogout = () => {
+    localStorage.removeItem('token')
+    setToken(null)
+  }
+
+  if (!token) {
+    return <Login onLogin={handleLogin} />
+  }
+{% endif %}
   return (
     <div className="flex min-h-screen bg-slate-950 text-slate-100 font-sans">
       {/* Sidebar */}
@@ -53,6 +75,15 @@ function AppContent() {
         </nav>
 
         <div className="mt-auto border-t border-slate-900 pt-4 px-2">
+          {% if auth %}
+          <button 
+            onClick={handleLogout}
+            className="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition-all duration-200 mb-4"
+          >
+            <LogOut className="w-4 h-4" />
+            Logout
+          </button>
+          {% endif %}
           <p className="text-xs text-slate-500">FastAPI + React SPA</p>
           <p className="text-[10px] text-slate-600 mt-1">Status: <span className="text-emerald-500 font-semibold">Online</span></p>
         </div>

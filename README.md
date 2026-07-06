@@ -20,10 +20,12 @@ A rapid prototyping CLI tool designed to take multiple CSV files, Excel spreadsh
 
 ## Installation
 
-Install the package locally in editable mode:
+Install the package directly from PyPI:
 ```bash
-pip install -e .
+pip install sirius-cli
 ```
+
+*(For local development: clone the repository and run `pip install -e .`)*
 
 ---
 

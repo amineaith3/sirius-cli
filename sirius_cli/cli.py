@@ -97,7 +97,10 @@ def init(
     api_url: Optional[str] = typer.Option(None, "--api-url", help="Override the frontend VITE_API_URL (default: http://localhost:<port>)"),
     no_seed: bool = typer.Option(False, "--no-seed", help="Skip seeding the database from CSV/Excel files"),
     pg: bool = typer.Option(False, "--pg", help="Use PostgreSQL instead of SQLite"),
-    mysql: bool = typer.Option(False, "--mysql", help="Use MySQL instead of SQLite")
+    mysql: bool = typer.Option(False, "--mysql", help="Use MySQL instead of SQLite"),
+    auth: bool = typer.Option(False, "--auth", help="Generate JWT authentication logic"),
+    admin_user: str = typer.Option("admin", "--admin-user", help="Default admin username if --auth is used"),
+    admin_pass: str = typer.Option("admin", "--admin-pass", help="Default admin password if --auth is used")
 ):
     """Initializes a new FastAPI backend and React frontend stack from data files or configuration."""
     # Ensure one and only one source parameter is provided
@@ -150,7 +153,10 @@ def init(
     typer.echo(f"Scaffolding project in: {dest_dir} (Theme: {resolved_theme}, Port: {port}, DB: {db_type})")
     
     try:
-        generate_project(dest_dir, schemas, theme=resolved_theme, port=port, api_url=resolved_api_url, db_type=db_type)
+        generate_project(
+            dest_dir, schemas, theme=resolved_theme, port=port, api_url=resolved_api_url, 
+            db_type=db_type, auth=auth, admin_user=admin_user, admin_pass=admin_pass
+        )
     except Exception as e:
         typer.secho(f"Error generating files: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
@@ -259,7 +265,10 @@ def update(
     port: int = typer.Option(8000, "--port", "-p", help="Backend server port (used in docker-compose and .env)"),
     api_url: Optional[str] = typer.Option(None, "--api-url", help="Override the frontend VITE_API_URL (default: http://localhost:<port>)"),
     pg: bool = typer.Option(False, "--pg", help="Use PostgreSQL instead of SQLite"),
-    mysql: bool = typer.Option(False, "--mysql", help="Use MySQL instead of SQLite")
+    mysql: bool = typer.Option(False, "--mysql", help="Use MySQL instead of SQLite"),
+    auth: bool = typer.Option(False, "--auth", help="Generate JWT authentication logic"),
+    admin_user: str = typer.Option("admin", "--admin-user", help="Default admin username if --auth is used"),
+    admin_pass: str = typer.Option("admin", "--admin-pass", help="Default admin password if --auth is used")
 ):
     """Updates an existing project with new columns/tables."""
     if not os.path.exists(project_path):
@@ -295,7 +304,10 @@ def update(
 
     typer.echo(f"Updating project in: {project_path}")
     try:
-        generate_project(project_path, schemas, theme=theme, port=port, api_url=resolved_api_url, db_type=db_type)
+        generate_project(
+            project_path, schemas, theme=theme, port=port, api_url=resolved_api_url, 
+            db_type=db_type, auth=auth, admin_user=admin_user, admin_pass=admin_pass
+        )
     except Exception as e:
         typer.secho(f"Error generating files: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)

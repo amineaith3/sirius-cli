@@ -16,7 +16,11 @@ def render_template(env, template_name, dest_path, **kwargs):
     with open(dest_path, "w", encoding="utf-8") as f:
         f.write(content)
 
-def generate_project(project_path: str, schemas: dict, theme: str = "blue", port: int = 8000, api_url: str = "http://localhost:8000", db_type: str = "sqlite"):
+def generate_project(
+    project_path: str, schemas: dict, theme: str = "blue", 
+    port: int = 8000, api_url: str = "http://localhost:8000", db_type: str = "sqlite",
+    auth: bool = False, admin_user: str = "admin", admin_pass: str = "admin"
+):
     """Generates complete FastAPI and React frontend files structure based on inferred schemas and theme."""
     env = get_env()
     
@@ -29,7 +33,10 @@ def generate_project(project_path: str, schemas: dict, theme: str = "blue", port
         theme=theme,
         port=port,
         api_url=api_url,
-        db_type=db_type
+        db_type=db_type,
+        auth=auth,
+        admin_user=admin_user,
+        admin_pass=admin_pass
     )
     
     # 2. Backend FastAPI application files
@@ -44,6 +51,9 @@ def generate_project(project_path: str, schemas: dict, theme: str = "blue", port
         "backend/Dockerfile.jinja2": "Dockerfile"
     }
     
+    if auth:
+        backend_templates["backend/auth.py.jinja2"] = "auth.py"
+        
     for t_path, dest_name in backend_templates.items():
         render_template(
             env,
@@ -53,7 +63,10 @@ def generate_project(project_path: str, schemas: dict, theme: str = "blue", port
             theme=theme,
             port=port,
             api_url=api_url,
-            db_type=db_type
+            db_type=db_type,
+            auth=auth,
+            admin_user=admin_user,
+            admin_pass=admin_pass
         )
         
     # Write init file to make backend a python package
@@ -78,6 +91,9 @@ def generate_project(project_path: str, schemas: dict, theme: str = "blue", port
         "frontend/src/Dashboard.tsx.jinja2": "src/Dashboard.tsx"
     }
     
+    if auth:
+        frontend_templates["frontend/src/Login.tsx.jinja2"] = "src/pages/Login.tsx"
+        
     for t_path, dest_name in frontend_templates.items():
         render_template(
             env,
@@ -87,7 +103,10 @@ def generate_project(project_path: str, schemas: dict, theme: str = "blue", port
             theme=theme,
             port=port,
             api_url=api_url,
-            db_type=db_type
+            db_type=db_type,
+            auth=auth,
+            admin_user=admin_user,
+            admin_pass=admin_pass
         )
         
     # 4. Generate dynamic CRUD view pages for each table
@@ -103,7 +122,10 @@ def generate_project(project_path: str, schemas: dict, theme: str = "blue", port
             theme=theme,
             port=port,
             api_url=api_url,
-            db_type=db_type
+            db_type=db_type,
+            auth=auth,
+            admin_user=admin_user,
+            admin_pass=admin_pass
         )
 
 def render_alembic_files(backend_path: str, schemas: dict):
