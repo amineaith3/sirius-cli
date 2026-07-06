@@ -1,0 +1,89 @@
+import React from 'react'
+import { BrowserRouter as Router, Routes, Route, Link, useLocation } from 'react-router-dom'
+import { Database, Table, LayoutDashboard, ChevronRight } from 'lucide-react'
+import Dashboard from './Dashboard'
+{% for table_name, columns in schemas.items() %}
+import {{ table_name.replace('_', ' ').title().replace(' ', '') }}Crud from './pages/{{ table_name.replace('_', ' ').title().replace(' ', '') }}Crud'
+{% endfor %}
+
+const SidebarLink = ({ to, children, icon: Icon }: { to: string; children: React.ReactNode; icon: any }) => {
+  const location = useLocation()
+  const isActive = location.pathname === to
+  return (
+    <Link
+      to={to}
+      className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
+        isActive
+          ? 'bg-gradient-to-r from-brand-600 to-brand-700 text-white font-medium shadow-lg shadow-brand-500/20'
+          : 'text-slate-400 hover:text-slate-100 hover:bg-slate-900/60'
+      }`}
+    >
+      <Icon className={`w-5 h-5 transition-transform duration-200 ${isActive ? 'scale-110' : 'group-hover:scale-110'}`} />
+      <span className="text-sm font-outfit">{children}</span>
+      {isActive && <ChevronRight className="w-4 h-4 ml-auto" />}
+    </Link>
+  )
+}
+
+function AppContent() {
+  return (
+    <div className="flex min-h-screen bg-slate-950 text-slate-100 font-sans">
+      {/* Sidebar */}
+      <aside className="w-64 border-r border-slate-900 bg-slate-950/70 backdrop-blur-xl flex flex-col p-6 fixed h-full z-10">
+        <div className="flex items-center gap-3 mb-8 px-2">
+          <div className="p-2.5 bg-brand-500/10 text-brand-400 rounded-xl border border-brand-500/20">
+            <Database className="w-6 h-6 animate-pulse" />
+          </div>
+          <div>
+            <h1 className="font-outfit font-bold text-lg bg-gradient-to-r from-brand-400 to-brand-300 bg-clip-text text-transparent">Proto Console</h1>
+            <p className="text-[10px] text-slate-500 tracking-wider uppercase font-semibold">Generated Admin</p>
+          </div>
+        </div>
+
+        <nav className="flex-1 space-y-1.5 overflow-y-auto pr-1">
+          <SidebarLink to="/" icon={LayoutDashboard}>Dashboard</SidebarLink>
+          <div className="pt-4 pb-2">
+            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest px-4">Tables</p>
+          </div>
+          {% for table_name, columns in schemas.items() %}
+          <SidebarLink to="/{{ table_name }}" icon={Table}>
+            {{ table_name.replace('_', ' ').title() }}
+          </SidebarLink>
+          {% endfor %}
+        </nav>
+
+        <div className="mt-auto border-t border-slate-900 pt-4 px-2">
+          <p className="text-xs text-slate-500">FastAPI + React SPA</p>
+          <p className="text-[10px] text-slate-600 mt-1">Status: <span className="text-emerald-500 font-semibold">Online</span></p>
+        </div>
+      </aside>
+
+      {/* Main Content Area */}
+      <main className="flex-1 ml-64 min-h-screen flex flex-col bg-gradient-to-b from-slate-900/50 to-slate-950">
+        <header className="h-16 border-b border-slate-900/50 flex items-center px-8 bg-slate-950/50 backdrop-blur-md sticky top-0 z-20 justify-between">
+          <div className="flex items-center gap-2">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-ping"></span>
+            <span className="text-xs text-slate-400 font-medium">Development Instance</span>
+          </div>
+        </header>
+
+        <div className="p-8 flex-1">
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            {% for table_name, columns in schemas.items() %}
+            <Route path="/{{ table_name }}" element={<{{ table_name.replace('_', ' ').title().replace(' ', '') }}Crud />} />
+            {% endfor %}
+          </Routes>
+        </div>
+      </main>
+    </div>
+  )
+}
+
+export default function App() {
+  return (
+    <Router>
+      <AppContent />
+    </Router>
+  )
+}

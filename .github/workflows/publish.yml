@@ -1,0 +1,54 @@
+name: Publish Python 🐍 distribution 📦 to PyPI
+
+on:
+  push:
+    tags:
+      - 'v*' # This triggers the action ONLY when you push a version tag (e.g., v0.1.0)
+
+jobs:
+  build:
+    name: Build distribution 📦
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
+    
+    - name: Install build tool
+      run: python3 -m pip install build --user
+      
+    - name: Build a binary wheel and a source tarball
+      run: python3 -m build
+      
+    - name: Store the distribution packages
+      uses: actions/upload-artifact@v4
+      with:
+        name: python-package-distributions
+        path: dist/
+
+  publish-to-pypi:
+    name: Publish Python 🐍 distribution 📦 to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    
+    # Define the environment name matching your PyPI config
+    environment:
+      name: pypi
+      url: https://pypi.org/p/sirius-cli
+      
+    # MANDATORY: These permissions are required for OIDC trusted publishing
+    permissions:
+      id-token: write 
+      contents: read
+      
+    steps:
+      - name: Download all the dists
+        uses: actions/download-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
+          
+      - name: Publish distribution 📦 to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1

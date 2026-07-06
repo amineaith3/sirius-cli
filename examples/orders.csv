@@ -1,0 +1,4 @@
+id,order_ref,amount,status,user_id
+1,ORD-001,99.99,Pending,1
+2,ORD-002,149.50,Completed,2
+3,ORD-003,19.99,Cancelled,1

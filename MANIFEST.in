@@ -1,0 +1,3 @@
+recursive-include sirius_cli/templates *
+recursive-include sirius_cli/templates/backend/alembic *
+include sirius_cli/templates/frontend/.env.jinja2

@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=61.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sirius-cli"
+version = "0.1.0"
+description = "A rapid prototyping tool for generating containerized backend + frontend CRUD stacks from CSV/SQLite files."
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "typer>=0.9.0",
+    "jinja2>=3.0.0",
+    "pandas>=1.5.0",
+    "sqlalchemy>=2.0.0",
+    "alembic>=1.11.0",
+    "pydantic>=2.0.0",
+    "openpyxl>=3.0.0"
+]
+
+[project.scripts]
+sirius-init = "sirius_cli.cli:app"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["sirius_cli", "sirius_cli.*"]

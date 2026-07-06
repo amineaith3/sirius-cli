@@ -1,0 +1,178 @@
+import io
+import json
+from fastapi import FastAPI, Depends, HTTPException, Query, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+from sqlalchemy import or_, cast, String as SAString, desc as sa_desc, asc as sa_asc
+from sqlalchemy.orm import Session
+from typing import List, Optional
+
+from .database import engine, get_db
+from . import models, schemas
+
+# Automatically create tables if they do not exist
+models.Base.metadata.create_all(bind=engine)
+
+app = FastAPI(title="Proto-CLI Generated Backend API", version="0.1.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.get("/")
+def read_root():
+    return {"message": "Welcome to the generated Proto-CLI API!"}
+
+@app.get("/api/metadata")
+def get_metadata(db: Session = Depends(get_db)):
+    meta = []
+    {% for table_name, columns in schemas.items() %}
+    {% set model_name = table_name.replace('_', ' ').title().replace(' ', '') + "Model" %}
+    meta.append({
+        "name": "{{ table_name }}",
+        "count": db.query(models.{{ model_name }}).count(),
+        "columns": json.loads("""{{ columns | tojson }}""")
+    })
+    {% endfor %}
+    return meta
+
+{% for table_name, columns in schemas.items() %}
+{% set model_name = table_name.replace('_', ' ').title().replace(' ', '') + "Model" %}
+{% set schema_response = table_name.replace('_', ' ').title().replace(' ', '') + "Response" %}
+{% set schema_create = table_name.replace('_', ' ').title().replace(' ', '') + "Create" %}
+{% set schema_update = table_name.replace('_', ' ').title().replace(' ', '') + "Update" %}
+
+# --- Endpoints for {{ table_name }} ---
+
+@app.get("/api/{{ table_name }}", response_model=List[schemas.{{ schema_response }}])
+def list_{{ table_name }}(
+    limit: int = 100,
+    offset: int = 0,
+    search: Optional[str] = Query(None, description="Search across all text columns"),
+    order_by: Optional[str] = Query(None, description="Column name to sort by"),
+    dir: Optional[str] = Query("asc", description="Sort direction: asc or desc"),
+    db: Session = Depends(get_db)
+):
+    query = db.query(models.{{ model_name }})
+
+    # Server-side search: filter across all string-castable columns
+    if search:
+        search_term = f"%{search}%"
+        search_filters = []
+        for col in models.{{ model_name }}.__table__.columns:
+            search_filters.append(cast(col, SAString).ilike(search_term))
+        if search_filters:
+            query = query.filter(or_(*search_filters))
+
+    # Column sorting
+    if order_by and hasattr(models.{{ model_name }}, order_by):
+        col_attr = getattr(models.{{ model_name }}, order_by)
+        query = query.order_by(sa_desc(col_attr) if dir == "desc" else sa_asc(col_attr))
+
+    records = query.offset(offset).limit(limit).all()
+    return records
+
+@app.get("/api/{{ table_name }}/export")
+def export_{{ table_name }}(
+    fmt: Optional[str] = Query("csv", description="Export format: csv or xlsx"),
+    db: Session = Depends(get_db)
+):
+    records = db.query(models.{{ model_name }}).all()
+    col_names = [c.name for c in models.{{ model_name }}.__table__.columns]
+
+    if fmt == "xlsx":
+        try:
+            from openpyxl import Workbook
+        except ImportError:
+            raise HTTPException(status_code=500, detail="openpyxl is not installed on the server")
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "{{ table_name }}"
+        ws.append(col_names)
+        for record in records:
+            row = []
+            for col in col_names:
+                val = getattr(record, col)
+                row.append(val if val is not None else "")
+            ws.append(row)
+
+        buf = io.BytesIO()
+        wb.save(buf)
+        buf.seek(0)
+
+        return StreamingResponse(
+            buf,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": "attachment; filename={{ table_name }}.xlsx"}
+        )
+
+    # Default: CSV export
+    def generate():
+        yield ",".join(col_names) + "\n"
+        for record in records:
+            row_values = []
+            for col in col_names:
+                val = getattr(record, col)
+                if val is None:
+                    row_values.append("")
+                elif isinstance(val, bool):
+                    row_values.append(str(val))
+                else:
+                    val_str = str(val).replace('"', '""')
+                    if ',' in val_str or '\n' in val_str or '"' in val_str:
+                        row_values.append(f'"{val_str}"')
+                    else:
+                        row_values.append(val_str)
+            yield ",".join(row_values) + "\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename={{ table_name }}.csv"}
+    )
+
+@app.get("/api/{{ table_name }}/{id}", response_model=schemas.{{ schema_response }})
+def get_{{ table_name }}(id: int, db: Session = Depends(get_db)):
+    record = db.query(models.{{ model_name }}).filter(models.{{ model_name }}.id == id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Record not found in {{ table_name }}")
+    return record
+
+@app.post("/api/{{ table_name }}", response_model=schemas.{{ schema_response }}, status_code=status.HTTP_201_CREATED)
+def create_{{ table_name }}(payload: schemas.{{ schema_create }}, db: Session = Depends(get_db)):
+    db_record = models.{{ model_name }}(**payload.model_dump())
+    db.add(db_record)
+    db.commit()
+    db.refresh(db_record)
+    return db_record
+
+@app.put("/api/{{ table_name }}/{id}", response_model=schemas.{{ schema_response }})
+def update_{{ table_name }}(id: int, payload: schemas.{{ schema_update }}, db: Session = Depends(get_db)):
+    db_record = db.query(models.{{ model_name }}).filter(models.{{ model_name }}.id == id).first()
+    if not db_record:
+        raise HTTPException(status_code=404, detail="Record not found in {{ table_name }}")
+    
+    update_data = payload.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_record, key, value)
+        
+    db.commit()
+    db.refresh(db_record)
+    return db_record
+
+@app.delete("/api/{{ table_name }}/{id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_{{ table_name }}(id: int, db: Session = Depends(get_db)):
+    db_record = db.query(models.{{ model_name }}).filter(models.{{ model_name }}.id == id).first()
+    if not db_record:
+        raise HTTPException(status_code=404, detail="Record not found in {{ table_name }}")
+    
+    db.delete(db_record)
+    db.commit()
+    return None
+
+{% endfor %}

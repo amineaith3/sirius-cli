@@ -1,0 +1,23 @@
+{
+  "project_name": "billing_system",
+  "theme": "emerald",
+  "entities": {
+    "customers": {
+      "columns": [
+        {"name": "id", "type": "Integer", "is_pk": true},
+        {"name": "name", "type": "String"},
+        {"name": "email", "type": "String"},
+        {"name": "is_active", "type": "Boolean"}
+      ]
+    },
+    "invoices": {
+      "columns": [
+        {"name": "id", "type": "Integer", "is_pk": true},
+        {"name": "ref_no", "type": "String"},
+        {"name": "amount", "type": "Float"},
+        {"name": "customer_id", "type": "Integer", "foreign_key": "customers.id"},
+        {"name": "created_at", "type": "DateTime"}
+      ]
+    }
+  }
+}

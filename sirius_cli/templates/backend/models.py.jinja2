@@ -1,0 +1,31 @@
+from sqlalchemy import Column, Integer, Float, String, Boolean, DateTime, ForeignKey
+from sqlalchemy.orm import relationship
+from .database import Base
+
+
+{% for table_name, columns in schemas.items() %}
+{% set class_name = table_name.replace('_', ' ').title().replace(' ', '') + "Model" %}
+class {{ class_name }}(Base):
+    __tablename__ = "{{ table_name }}"
+
+    {% for col in columns %}
+    {% if col.is_pk %}
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    {% elif col.foreign_key %}
+    {{ col.name }} = Column({{ col.type }}, ForeignKey('{{ col.foreign_key }}'), nullable=True)
+    {% else %}
+    {{ col.name }} = Column({{ col.type }}, nullable=True)
+    {% endif %}
+    {% endfor %}
+
+    # Relationships
+    {% for col in columns %}
+    {% if col.foreign_key %}
+    {% set ref_table = col.foreign_key.split('.')[0] %}
+    {% set ref_class = ref_table.replace('_', ' ').title().replace(' ', '') + "Model" %}
+    {% set prop_name = col.name[:-3] if col.name.endswith('_id') else ref_table %}
+    {{ prop_name }} = relationship("{{ ref_class }}")
+    {% endif %}
+    {% endfor %}
+
+{% endfor %}
