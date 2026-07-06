@@ -5,10 +5,33 @@ import subprocess
 import typer
 from pathlib import Path
 from typing import List, Optional
+import importlib.metadata
 from sirius_cli.parser import parse_csv_files, parse_sqlite_db, parse_config_file, parse_excel_files, sanitize_table_name, sanitize_column_name
 from sirius_cli.generator import generate_project, render_alembic_files
 
 app = typer.Typer(help="Sirius-CLI: A rapid prototyping backend and frontend code generator.")
+
+def version_callback(value: bool):
+    if value:
+        try:
+            version = importlib.metadata.version("sirius-cli")
+        except importlib.metadata.PackageNotFoundError:
+            version = "unknown"
+        typer.echo(f"Sirius-CLI version: {version}")
+        raise typer.Exit()
+
+@app.callback()
+def main(
+    version: Optional[bool] = typer.Option(
+        None,
+        "--version",
+        "-v",
+        help="Show the application's version and exit.",
+        callback=version_callback,
+        is_eager=True,
+    )
+):
+    pass
 
 def seed_database_from_csvs(project_path: str, csv_paths: list):
     """Seeds the generated SQLite database with the row entries from the source CSVs."""
