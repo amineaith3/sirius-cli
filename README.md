@@ -34,16 +34,16 @@ pip install sirius-cli
 ### 1. Generating from CSVs or Excel
 ```bash
 # From CSVs
-sirius-init store_system --csv examples/users.csv --csv examples/orders.csv --theme violet
+sirius-init init store_system --csv examples/users.csv --csv examples/orders.csv --theme violet
 
 # From Excel
-sirius-init store_system --excel examples/products.xlsx --theme amber
+sirius-init init store_system --excel examples/products.xlsx --theme amber
 ```
 
 ### 2. Target Production Databases
 By default, the stack uses an embedded SQLite file (`app.db`). You can target Postgres or MySQL instead:
 ```bash
-sirius-init billing_system --config schema.json --pg
+sirius-init init billing_system --config schema.json --pg
 ```
 *(The generated `docker-compose.yml` and `database.py` will expect a `DATABASE_URL` environment variable).*
 
@@ -76,17 +76,23 @@ Specify database schemas, relationships, and colors in a JSON file:
 ```
 Then run:
 ```bash
-sirius-init --config examples/billing-config.json
+sirius-init init billing_system --config examples/billing-config.json
+```
+
+### 4. Generating with JWT Authentication
+Pass the `--auth` flag to scaffold a secure project. This generates an `app_users` table, a beautiful Login screen, and protects all FastAPI routes with JWT Bearer tokens automatically.
+```bash
+sirius-init init secure_system --csv examples/users.csv --auth --admin-user "superadmin" --admin-pass "securepass123"
 ```
 
 ---
 
-## Usage: Updating an Existing Project (`sirius-update`)
+## Usage: Updating an Existing Project (`update`)
 
-If your data requirements change (e.g., adding a `reviews` table to your store), you don't need to start from scratch. Use `sirius-update` to merge new schemas into an existing project.
+If your data requirements change (e.g., adding a `reviews` table to your store), you don't need to start from scratch. Use the `update` command to merge new schemas into an existing project.
 
 ```bash
-sirius-update ./store_system --csv examples/new_reviews.csv
+sirius-init update ./store_system --csv examples/new_reviews.csv
 ```
 
 Sirius-CLI will:
@@ -111,6 +117,9 @@ Sirius-CLI will:
 | `--port` | `-p` | `8000` | Backend port (used in Dockerfile, docker-compose, .env) |
 | `--api-url` | | `http://localhost:<port>` | Override the frontend VITE_API_URL |
 | `--no-seed` | | `false` | Skip seeding the DB from source CSV/Excel files |
+| `--auth` | | `false` | Generate JWT authentication logic and a React Login screen |
+| `--admin-user` | | `admin` | The default admin username to seed if `--auth` is enabled |
+| `--admin-pass` | | `admin` | The default admin password to seed if `--auth` is enabled |
 | `--pg` | | `false` | Generate Postgres connection pool and drivers |
 | `--mysql` | | `false` | Generate MySQL connection pool and drivers |
 
