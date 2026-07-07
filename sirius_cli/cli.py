@@ -272,7 +272,7 @@ def init(
     typer.echo("To run the stack with docker compose:")
     typer.secho(f"  cd {project_name} && docker compose up --build", fg=typer.colors.CYAN)
     typer.echo("To start individual servers locally:")
-    typer.secho(f"  Backend:  cd {project_name}/backend && pip install -r requirements.txt && uvicorn backend.main:app --reload --port {port}", fg=typer.colors.CYAN)
+    typer.secho(f"  Backend:  cd {project_name} && pip install -r backend/requirements.txt && uvicorn backend.main:app --reload --port {port}", fg=typer.colors.CYAN)
     typer.secho(f"  Frontend: cd {project_name}/frontend && npm install && npm run dev", fg=typer.colors.CYAN)
     typer.secho(f"  API URL:  {resolved_api_url}", fg=typer.colors.CYAN)
 

@@ -136,8 +136,8 @@ docker compose up --build
 ### Running Locally
 1. **Start Backend**:
    ```bash
-   cd <project_name>/backend
-   pip install -r requirements.txt
+   cd <project_name>
+   pip install -r backend/requirements.txt
    uvicorn backend.main:app --reload --port 8000
    ```
 2. **Start Frontend**:
