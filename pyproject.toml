@@ -4,10 +4,19 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sirius-cli"
-version = "0.2.5"
+version = "0.2.6"
 description = "A rapid prototyping tool for generating containerized backend + frontend CRUD stacks from CSV/SQLite files."
 readme = "README.md"
 requires-python = ">=3.8"
+license = { text = "AGPLv3" }
+authors = [
+    { name = "Amine Ait Hamma", email = "amineaithamma2004@gmail.com" }
+]
+
+[project.urls]
+Homepage = "https://sirius-aah.com"
+Repository = "https://github.com/amineaith3/sirius-cli"
+"Bug Tracker" = "https://github.com/amineaith3/sirius-cli/issues"
 dependencies = [
     "typer>=0.9.0",
     "jinja2>=3.0.0",
