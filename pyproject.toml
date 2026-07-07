@@ -12,11 +12,6 @@ license = { text = "AGPLv3" }
 authors = [
     { name = "Amine Ait Hamma", email = "amineaithamma2004@gmail.com" }
 ]
-
-[project.urls]
-Homepage = "https://sirius-aah.com"
-Repository = "https://github.com/amineaith3/sirius-cli"
-"Bug Tracker" = "https://github.com/amineaith3/sirius-cli/issues"
 dependencies = [
     "typer>=0.9.0",
     "jinja2>=3.0.0",
@@ -27,6 +22,11 @@ dependencies = [
     "openpyxl>=3.0.0",
     "inflect>=7.0.0"
 ]
+
+[project.urls]
+Homepage = "https://sirius-aah.com"
+Repository = "https://github.com/amineaith3/sirius-cli"
+"Bug Tracker" = "https://github.com/amineaith3/sirius-cli/issues"
 
 [project.scripts]
 sirius-init = "sirius_cli.cli:app"
