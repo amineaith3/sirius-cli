@@ -3,68 +3,19 @@ import re
 import sqlite3
 import json
 import pandas as pd
+import inflect
 
-# Irregular plural/singular mappings for FK heuristic resolution
-_IRREGULAR_PLURALS = {
-    "person": "people",
-    "man": "men",
-    "woman": "women",
-    "child": "children",
-    "tooth": "teeth",
-    "foot": "feet",
-    "mouse": "mice",
-    "goose": "geese",
-    "ox": "oxen",
-    "leaf": "leaves",
-    "life": "lives",
-    "knife": "knives",
-    "wife": "wives",
-    "half": "halves",
-    "loaf": "loaves",
-    "potato": "potatoes",
-    "tomato": "tomatoes",
-    "cactus": "cacti",
-    "focus": "foci",
-    "fungus": "fungi",
-    "nucleus": "nuclei",
-    "syllabus": "syllabi",
-    "analysis": "analyses",
-    "diagnosis": "diagnoses",
-    "oasis": "oases",
-    "thesis": "theses",
-    "crisis": "crises",
-    "phenomenon": "phenomena",
-    "criterion": "criteria",
-    "datum": "data",
-}
-_IRREGULAR_SINGULARS = {v: k for k, v in _IRREGULAR_PLURALS.items()}
+_inflect = inflect.engine()
 
 def _pluralize(word: str) -> str:
-    """Returns a best-guess plural of a singular English word."""
-    if word in _IRREGULAR_PLURALS:
-        return _IRREGULAR_PLURALS[word]
-    if word.endswith(("s", "sh", "ch", "x", "z")):
-        return word + "es"
-    if word.endswith("y") and len(word) > 1 and word[-2] not in "aeiou":
-        return word[:-1] + "ies"
-    if word.endswith(("f", "fe")):
-        return word.rstrip("e").rstrip("f") + "ves"
-    return word + "s"
+    """Returns the plural of a word using the inflect library."""
+    result = _inflect.plural(word)
+    return result if result else word + 's'
 
 def _singularize(word: str) -> str:
-    """Returns a best-guess singular of a plural English word."""
-    if word in _IRREGULAR_SINGULARS:
-        return _IRREGULAR_SINGULARS[word]
-    if word.endswith("ies") and len(word) > 3:
-        return word[:-3] + "y"
-    if word.endswith("ves"):
-        # could be -f or -fe ending
-        return word[:-3] + "f"
-    if word.endswith("es") and word[:-2] in ("",) or word.endswith(("ses", "shes", "ches", "xes", "zes")):
-        return word[:-2]
-    if word.endswith("s") and not word.endswith("ss"):
-        return word[:-1]
-    return word
+    """Returns the singular of a word using the inflect library."""
+    result = _inflect.singular_noun(word)
+    return result if result else word
 
 def sanitize_table_name(name: str) -> str:
     """Sanitizes file path/table name to a valid SQL identifier."""

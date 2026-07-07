@@ -1,5 +1,5 @@
-import React, { useEffect, useState, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import React, { useEffect, useState, useCallback, useRef } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Plus, Edit2, Trash2, X, ChevronLeft, ChevronRight, Loader2, Search, Download, ArrowUpDown, ArrowUp, ArrowDown, FileSpreadsheet } from 'lucide-react'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -11,10 +11,13 @@ interface RecordType {
 
 export default function {{ table_name.replace('_', ' ').title().replace(' ', '') }}Crud() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [records, setRecords] = useState<RecordType[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [highlightId, setHighlightId] = useState<number | null>(null)
+  const rowRefs = useRef<Record<number, HTMLTableRowElement | null>>({})
 
   // Pagination states
   const [page, setPage] = useState(1)
@@ -65,6 +68,27 @@ export default function {{ table_name.replace('_', ' ').title().replace(' ', '')
     }, 350)
     return () => clearTimeout(timer)
   }, [search])
+
+  // Handle ?highlight=ID param — scroll to and flash the row
+  useEffect(() => {
+    const idParam = searchParams.get('highlight')
+    if (!idParam) return
+    const id = parseInt(idParam, 10)
+    setHighlightId(id)
+    // Clear param from URL without re-navigating
+    setSearchParams({}, { replace: true })
+    // Scroll to row once records are loaded
+    const tryScroll = () => {
+      const el = rowRefs.current[id]
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    }
+    const timer = setTimeout(tryScroll, 300)
+    // Auto-clear highlight after animation
+    const clearTimer = setTimeout(() => setHighlightId(null), 2500)
+    return () => { clearTimeout(timer); clearTimeout(clearTimer) }
+  }, [searchParams, records])
 
   const fetchRecords = useCallback(async () => {
     try {
@@ -361,7 +385,15 @@ export default function {{ table_name.replace('_', ' ').title().replace(' ', '')
               </thead>
               <tbody className="divide-y divide-slate-900">
                 {displayedRecords.map((record) => (
-                  <tr key={record.id} className="hover:bg-slate-900/30 transition-colors">
+                  <tr
+                    key={record.id}
+                    ref={el => { rowRefs.current[record.id] = el }}
+                    className={`transition-colors ${
+                      highlightId === record.id
+                        ? 'bg-brand-500/10 ring-1 ring-inset ring-brand-500/40 animate-pulse'
+                        : 'hover:bg-slate-900/30'
+                    }`}
+                  >
                     {% for col in columns %}
                     <td className="px-6 py-4 text-xs font-medium text-slate-300 font-mono">
                       {% if col.type == 'Boolean' %}
@@ -377,9 +409,9 @@ export default function {{ table_name.replace('_', ' ').title().replace(' ', '')
                       {% elif col.foreign_key %}
                       {% set target_table = col.foreign_key.split('.')[0] %}
                       <button
-                        onClick={() => record.{{ col.name }} !== null && navigate('/{{ target_table }}')}
+                        onClick={() => record.{{ col.name }} !== null && navigate('/{{ target_table }}?highlight=' + record.{{ col.name }})}
                         className="px-2 py-0.5 rounded bg-slate-800/80 text-brand-400 border border-slate-700/40 text-[10px] font-bold cursor-pointer hover:bg-slate-700/60 hover:border-brand-500/30 transition-all"
-                        title="Navigate to {{ target_table }}"
+                        title="Go to {{ target_table }} record"
                       >
                         {(() => {
                           const opt = {{ target_table }}Options.find((o: any) => o.id === record.{{ col.name }})

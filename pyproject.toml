@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sirius-cli"
-version = "0.2.4"
+version = "0.2.5"
 description = "A rapid prototyping tool for generating containerized backend + frontend CRUD stacks from CSV/SQLite files."
 readme = "README.md"
 requires-python = ">=3.8"
@@ -15,7 +15,8 @@ dependencies = [
     "sqlalchemy>=2.0.0",
     "alembic>=1.11.0",
     "pydantic>=2.0.0",
-    "openpyxl>=3.0.0"
+    "openpyxl>=3.0.0",
+    "inflect>=7.0.0"
 ]
 
 [project.scripts]
