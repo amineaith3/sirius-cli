@@ -4,14 +4,18 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 {% if db_type == 'pg' %}
-# PostgreSQL connection — set DATABASE_URL environment variable for custom credentials
+# PostgreSQL connection
+# ⚠ PRODUCTION: Set the DATABASE_URL environment variable with your real credentials.
+#   Example: DATABASE_URL=postgresql://user:password@host:5432/dbname
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
     "postgresql://postgres:postgres@localhost:5432/{{ project_name | default('app', true) }}"
 )
 engine = create_engine(DATABASE_URL)
 {% elif db_type == 'mysql' %}
-# MySQL connection — set DATABASE_URL environment variable for custom credentials
+# MySQL connection
+# ⚠ PRODUCTION: Set the DATABASE_URL environment variable with your real credentials.
+#   Example: DATABASE_URL=mysql+pymysql://user:password@host:3306/dbname
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
     "mysql+pymysql://root:root@localhost:3306/{{ project_name | default('app', true) }}"

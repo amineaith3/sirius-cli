@@ -6,6 +6,19 @@ A rapid prototyping CLI tool designed to take multiple CSV files, Excel spreadsh
 
 ---
 
+## Prerequisites
+
+Before using Sirius-CLI, ensure you have the following installed:
+
+| Requirement | Minimum Version | Purpose |
+|---|---|---|
+| **Python** | 3.9+ | Runtime for the CLI tool itself |
+| **pip** | Latest | Installing sirius-cli from PyPI |
+| **Node.js** | 16+ | Running the generated React frontend (`npm install`, `npm run dev`) |
+| **Docker** *(optional)* | 20+ | Running the full stack via `docker compose up` |
+
+---
+
 ## Key Capabilities
 
 - **Automatic Relationship Mapping**: Automatically extracts foreign keys from databases and resolves CSV/Excel associations using naming heuristics (linking `[table]_id` fields), navigating irregular English plurals effortlessly.
@@ -14,7 +27,7 @@ A rapid prototyping CLI tool designed to take multiple CSV files, Excel spreadsh
 - **Enterprise Data Grid**: The generated tables feature server-side searching (`?search=`), server-side column sorting (`?order_by=`), and dual data export buttons (CSV and Excel `.xlsx`).
 - **Dashboard Analytics**: A built-in Recharts dashboard showing live dataset distribution and entity insights.
 - **Multiple Database Engines**: Target `SQLite` for rapid local prototyping, or generate `PostgreSQL` and `MySQL` ready projects out of the box using `--pg` and `--mysql`.
-- **Iterative Updates**: Use `sirius-update` to safely inject new tables or columns into an existing scaffolded project.
+- **Iterative Updates**: Use `sirius-init update` to safely inject new tables or columns into an existing scaffolded project.
 
 ---
 
@@ -29,7 +42,7 @@ pip install sirius-cli
 
 ---
 
-## Usage: Creating a New Project (`sirius-init`)
+## Usage: Creating a New Project (`sirius-init init`)
 
 ### 1. Generating from CSVs or Excel
 ```bash
@@ -84,10 +97,11 @@ Pass the `--auth` flag to scaffold a secure project. This generates an `app_user
 ```bash
 sirius-init init secure_system --csv examples/users.csv --auth --admin-user "superadmin" --admin-pass "securepass123"
 ```
+> **Security Note**: If you omit `--admin-pass`, a secure random password will be auto-generated and printed to your terminal. The generated project also reads `SECRET_KEY` from environment variables — be sure to set this in production.
 
 ---
 
-## Usage: Updating an Existing Project (`update`)
+## Usage: Updating an Existing Project (`sirius-init update`)
 
 If your data requirements change (e.g., adding a `reviews` table to your store), you don't need to start from scratch. Use the `update` command to merge new schemas into an existing project.
 
@@ -104,7 +118,7 @@ Sirius-CLI will:
 
 ## All CLI Flags
 
-### `sirius-init` / `sirius-update`
+### `sirius-init init` / `sirius-init update`
 
 | Flag | Short | Default | Description |
 |---|---|---|---|
@@ -119,7 +133,7 @@ Sirius-CLI will:
 | `--no-seed` | | `false` | Skip seeding the DB from source CSV/Excel files |
 | `--auth` | | `false` | Generate JWT authentication logic and a React Login screen |
 | `--admin-user` | | `admin` | The default admin username to seed if `--auth` is enabled |
-| `--admin-pass` | | `admin` | The default admin password to seed if `--auth` is enabled |
+| `--admin-pass` | | *(auto-generated)* | The admin password to seed if `--auth` is enabled |
 | `--pg` | | `false` | Generate Postgres connection pool and drivers |
 | `--mysql` | | `false` | Generate MySQL connection pool and drivers |
 
@@ -140,13 +154,26 @@ docker compose up --build
    pip install -r backend/requirements.txt
    uvicorn backend.main:app --reload --port 8000
    ```
-2. **Start Frontend**:
+2. **Start Frontend** *(requires Node.js 16+)*:
    ```bash
    cd <project_name>/frontend
    npm install
    npm run dev
    ```
    Open `http://localhost:5173/` in your browser.
+
+---
+
+## OS Compatibility
+
+| OS | Supported Versions |
+|---|---|
+| **Windows** | 10, 11 |
+| **macOS** | 12 (Monterey)+ |
+| **Linux** | Ubuntu 20.04+, Fedora 36+, Debian 11+ |
+| **WSL2** | Fully supported |
+
+**Python**: Requires **3.9 or higher**.
 
 ---
 

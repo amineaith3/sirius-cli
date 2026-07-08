@@ -18,9 +18,17 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Proto-CLI Generated Backend API", version="0.1.0")
 
+# CORS: Restrict origins to the frontend dev server and the configured API URL.
+# ⚠ Add your production domain here when deploying.
+_allowed_origins = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "{{ api_url }}",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -59,6 +67,9 @@ def get_metadata(db: Session = Depends(get_db)):
 
 # --- Endpoints for {{ table_name }} ---
 
+# Allowlist of valid column names for sorting
+_{{ table_name }}_sortable_columns = {{ '[' }}"{{ columns | map(attribute='name') | join('", "') }}"{{ ']' }}
+
 @app.get("/api/{{ table_name }}", response_model=List[schemas.{{ schema_response }}])
 def list_{{ table_name }}(
     limit: int = 100,
@@ -80,10 +91,11 @@ def list_{{ table_name }}(
         if search_filters:
             query = query.filter(or_(*search_filters))
 
-    # Column sorting
-    if order_by and hasattr(models.{{ model_name }}, order_by):
-        col_attr = getattr(models.{{ model_name }}, order_by)
-        query = query.order_by(sa_desc(col_attr) if dir == "desc" else sa_asc(col_attr))
+    # Column sorting — validated against allowlist to prevent attribute probing
+    if order_by and order_by in _{{ table_name }}_sortable_columns:
+        col_attr = getattr(models.{{ model_name }}, order_by, None)
+        if col_attr is not None:
+            query = query.order_by(sa_desc(col_attr) if dir == "desc" else sa_asc(col_attr))
 
     records = query.offset(offset).limit(limit).all()
     return records

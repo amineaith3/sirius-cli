@@ -7,7 +7,7 @@ name = "sirius-cli"
 version = "0.2.6"
 description = "A rapid prototyping tool for generating containerized backend + frontend CRUD stacks from CSV/SQLite files."
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 license = { text = "AGPLv3" }
 authors = [
     { name = "Amine Ait Hamma", email = "amineaithamma2004@gmail.com" }

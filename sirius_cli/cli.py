@@ -1,5 +1,7 @@
 import os
 import csv
+import re
+import secrets
 import sqlite3
 import subprocess
 import typer
@@ -10,6 +12,46 @@ from sirius_cli.parser import parse_csv_files, parse_sqlite_db, parse_config_fil
 from sirius_cli.generator import generate_project, render_alembic_files
 
 app = typer.Typer(help="Sirius-CLI: A rapid prototyping backend and frontend code generator.")
+
+# --- Security helpers ---
+
+# Regex pattern for valid SQL identifiers (alphanumeric + underscore, must start with letter or _)
+_VALID_SQL_IDENT = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*$')
+
+def _quote_ident(name: str) -> str:
+    """Double-quote a SQL identifier after validating it contains only safe characters.
+    This prevents SQL injection through table or column names."""
+    if not _VALID_SQL_IDENT.match(name):
+        raise ValueError(f"Invalid SQL identifier: {name!r}")
+    return f'"{name}"'
+
+def _find_alembic() -> str:
+    """Locate the alembic executable, preferring the one in the current Python environment."""
+    import shutil
+    alembic_path = shutil.which("alembic")
+    if alembic_path:
+        return alembic_path
+    # Fallback: try running via python -m alembic
+    return None
+
+def _run_alembic(args: list, cwd: str, env: dict = None):
+    """Run an alembic command safely without shell=True."""
+    alembic_path = _find_alembic()
+    if alembic_path:
+        cmd = [alembic_path] + args
+    else:
+        # Fallback: run as python module
+        import sys
+        cmd = [sys.executable, "-m", "alembic"] + args
+    
+    subprocess.run(
+        cmd,
+        cwd=cwd,
+        check=True,
+        env=env,
+        stdout=subprocess.DEVNULL
+    )
+
 
 def version_callback(value: bool):
     if value:
@@ -85,17 +127,19 @@ def seed_database_from_csvs(project_path: str, csv_paths: list):
         if not rows:
             continue
             
-        # Verify columns exist in target table
-        cursor.execute(f"PRAGMA table_info({table_name});")
+        # Verify columns exist in target table using quoted identifier
+        quoted_table = _quote_ident(table_name)
+        cursor.execute(f"PRAGMA table_info({quoted_table});")
         existing_cols = {info[1] for info in cursor.fetchall()}
         
         valid_cols = [c for c in cols if c in existing_cols]
         if not valid_cols:
             continue
             
+        # Build query with quoted identifiers for defense-in-depth
         placeholders = ", ".join(["?"] * len(valid_cols))
-        col_names_str = ", ".join(valid_cols)
-        query = f"INSERT OR IGNORE INTO {table_name} ({col_names_str}) VALUES ({placeholders});"
+        quoted_cols = ", ".join([_quote_ident(c) for c in valid_cols])
+        query = f"INSERT OR IGNORE INTO {quoted_table} ({quoted_cols}) VALUES ({placeholders});"
         
         data_to_insert = []
         for row in rows:
@@ -123,7 +167,7 @@ def init(
     mysql: bool = typer.Option(False, "--mysql", help="Use MySQL instead of SQLite"),
     auth: bool = typer.Option(False, "--auth", help="Generate JWT authentication logic"),
     admin_user: str = typer.Option("admin", "--admin-user", help="Default admin username if --auth is used"),
-    admin_pass: str = typer.Option("admin", "--admin-pass", help="Default admin password if --auth is used")
+    admin_pass: Optional[str] = typer.Option(None, "--admin-pass", help="Admin password if --auth is used (auto-generated if not provided)")
 ):
     """Initializes a new FastAPI backend and React frontend stack from data files or configuration."""
     # Ensure one and only one source parameter is provided
@@ -131,6 +175,14 @@ def init(
     if sum(inputs) != 1:
         typer.secho("Error: You must provide exactly one input option: --csv, --excel, --db, or --config.", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
+
+    # If --auth is used and no password provided, generate a secure random one
+    if auth and not admin_pass:
+        admin_pass = secrets.token_urlsafe(16)
+        typer.secho(f"\n[AUTH] Auto-generated admin password: {admin_pass}", fg=typer.colors.BRIGHT_YELLOW, bold=True)
+        typer.secho("   Save this password -- it will not be shown again.\n", fg=typer.colors.YELLOW)
+    elif not auth:
+        admin_pass = admin_pass or "admin"
 
     # Resolve API URL
     resolved_api_url = api_url or f"http://localhost:{port}"
@@ -177,7 +229,7 @@ def init(
     
     try:
         generate_project(
-            dest_dir, schemas, theme=resolved_theme, port=port, api_url=resolved_api_url, 
+            dest_dir, schemas, project_name=project_name, theme=resolved_theme, port=port, api_url=resolved_api_url, 
             db_type=db_type, auth=auth, admin_user=admin_user, admin_pass=admin_pass
         )
     except Exception as e:
@@ -188,14 +240,8 @@ def init(
     
     typer.echo("Initializing Alembic migration system...")
     try:
-        # Run alembic init
-        subprocess.run(
-            "alembic init alembic",
-            cwd=backend_path,
-            check=True,
-            shell=True,
-            stdout=subprocess.DEVNULL
-        )
+        # Run alembic init (no shell=True)
+        _run_alembic(["init", "alembic"], cwd=backend_path)
         
         # Write custom alembic migration runner templates
         render_alembic_files(backend_path, schemas)
@@ -213,39 +259,27 @@ def init(
             elif db_type == 'pg':
                 content = content.replace(
                     "sqlalchemy.url = driver://user:pass@localhost/dbname",
+                    # ⚠ CHANGE CREDENTIALS IN PRODUCTION
                     "sqlalchemy.url = postgresql://postgres:postgres@localhost:5432/app"
                 )
             elif db_type == 'mysql':
                 content = content.replace(
                     "sqlalchemy.url = driver://user:pass@localhost/dbname",
+                    # ⚠ CHANGE CREDENTIALS IN PRODUCTION
                     "sqlalchemy.url = mysql+pymysql://root:root@localhost:3306/app"
                 )
             with open(alembic_ini, "w") as f:
                 f.write(content)
                 
-        # Generate initial autogenerated migration script
+        # Generate initial autogenerated migration script (no shell=True)
         typer.echo("Autogenerating migration scripts...")
         env = os.environ.copy()
         env["PYTHONPATH"] = dest_dir + os.pathsep + env.get("PYTHONPATH", "")
-        subprocess.run(
-            "alembic revision --autogenerate -m \"Initial migration\"",
-            cwd=backend_path,
-            check=True,
-            shell=True,
-            env=env,
-            stdout=subprocess.DEVNULL
-        )
+        _run_alembic(["revision", "--autogenerate", "-m", "Initial migration"], cwd=backend_path, env=env)
         
-        # Apply initial migration structure to SQLite db
+        # Apply initial migration structure to SQLite db (no shell=True)
         typer.echo("Running database migrations...")
-        subprocess.run(
-            "alembic upgrade head",
-            cwd=backend_path,
-            check=True,
-            shell=True,
-            env=env,
-            stdout=subprocess.DEVNULL
-        )
+        _run_alembic(["upgrade", "head"], cwd=backend_path, env=env)
         
         typer.secho("[OK] Alembic migration system initialized successfully!", fg=typer.colors.GREEN)
         
@@ -291,7 +325,7 @@ def update(
     mysql: bool = typer.Option(False, "--mysql", help="Use MySQL instead of SQLite"),
     auth: bool = typer.Option(False, "--auth", help="Generate JWT authentication logic"),
     admin_user: str = typer.Option("admin", "--admin-user", help="Default admin username if --auth is used"),
-    admin_pass: str = typer.Option("admin", "--admin-pass", help="Default admin password if --auth is used")
+    admin_pass: Optional[str] = typer.Option(None, "--admin-pass", help="Admin password if --auth is used (auto-generated if not provided)")
 ):
     """Updates an existing project with new columns/tables."""
     if not os.path.exists(project_path):
@@ -302,6 +336,14 @@ def update(
     if sum(inputs) != 1:
         typer.secho("Error: You must provide exactly one input option: --csv, --excel, --db, or --config.", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
+
+    # If --auth is used and no password provided, generate a secure random one
+    if auth and not admin_pass:
+        admin_pass = secrets.token_urlsafe(16)
+        typer.secho(f"\n[AUTH] Auto-generated admin password: {admin_pass}", fg=typer.colors.BRIGHT_YELLOW, bold=True)
+        typer.secho("   Save this password -- it will not be shown again.\n", fg=typer.colors.YELLOW)
+    elif not auth:
+        admin_pass = admin_pass or "admin"
 
     resolved_api_url = api_url or f"http://localhost:{port}"
 
@@ -325,10 +367,13 @@ def update(
         typer.secho(f"Error parsing schemas: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
 
+    # Extract project name from path for template context
+    project_name = os.path.basename(os.path.abspath(project_path))
+
     typer.echo(f"Updating project in: {project_path}")
     try:
         generate_project(
-            project_path, schemas, theme=theme, port=port, api_url=resolved_api_url, 
+            project_path, schemas, project_name=project_name, theme=theme, port=port, api_url=resolved_api_url, 
             db_type=db_type, auth=auth, admin_user=admin_user, admin_pass=admin_pass
         )
     except Exception as e:
@@ -341,24 +386,11 @@ def update(
     env = os.environ.copy()
     env["PYTHONPATH"] = project_path + os.pathsep + env.get("PYTHONPATH", "")
     try:
-        subprocess.run(
-            f"alembic revision --autogenerate -m \"{message}\"",
-            cwd=backend_path,
-            check=True,
-            shell=True,
-            env=env,
-            stdout=subprocess.DEVNULL
-        )
+        # Safe: message is passed as a list element, not interpolated into a shell string
+        _run_alembic(["revision", "--autogenerate", "-m", message], cwd=backend_path, env=env)
         
         typer.echo("Running database migrations...")
-        subprocess.run(
-            "alembic upgrade head",
-            cwd=backend_path,
-            check=True,
-            shell=True,
-            env=env,
-            stdout=subprocess.DEVNULL
-        )
+        _run_alembic(["upgrade", "head"], cwd=backend_path, env=env)
         typer.secho("[OK] Database schema updated successfully!", fg=typer.colors.GREEN)
     except Exception as e:
         typer.secho(f"[WARNING] Autogenerated Alembic migration failed: {e}", fg=typer.colors.YELLOW)
