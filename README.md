@@ -4,7 +4,7 @@ A rapid prototyping CLI tool designed to take multiple CSV files, Excel spreadsh
 - A production-grade, container-ready **FastAPI** backend (with SQLAlchemy models, Pydantic v2 validation schemas, and automated Alembic migrations).
 - A modular, responsive, multi-page **React 18 (TypeScript, Vite, Tailwind CSS)** CRUD frontend with dynamic relational selectors and a beautiful Dashboard.
 
-📚 **[Read the Official Technical Documentation Here](https://docs-sirius-cli.sirius-aah.com/)**
+📚 **[Read the Official Technical Documentation Here](https://sirius-cli.sirius-aah.com/)**
 
 ---
 
