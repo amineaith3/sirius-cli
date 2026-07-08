@@ -4,8 +4,8 @@
 
 | Version | Supported |
 |---------|-----------|
-| 0.2.x   | ✅ Active  |
-| < 0.2.0 | ❌ No      |
+| >= 0.2.7 | ✅ Active (Secure) |
+| < 0.2.7 | ❌ Vulnerable |
 
 ## Reporting a Vulnerability
 
@@ -42,7 +42,7 @@ Sirius-CLI generates application scaffolds. The generated code is a **starting p
 
 ## Security Changelog
 
-### v0.2.7 (Upcoming)
+### v0.2.7 (Current Release)
 - **Fixed**: Hardcoded JWT secret key replaced with environment variable + auto-generated fallback
 - **Fixed**: Shell injection vulnerability via `--message` flag in `sirius-init update` (removed `shell=True`)
 - **Fixed**: SQL injection defense-in-depth in database seeder (quoted identifiers)
