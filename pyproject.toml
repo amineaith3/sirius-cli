@@ -25,6 +25,7 @@ dependencies = [
 
 [project.urls]
 Homepage = "https://sirius-aah.com"
+Documentation = "https://sirius-cli.sirius-aah.com"
 Repository = "https://github.com/amineaith3/sirius-cli"
 "Bug Tracker" = "https://github.com/amineaith3/sirius-cli/issues"
 
