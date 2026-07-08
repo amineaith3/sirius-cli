@@ -1,249 +1,234 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Sirius-CLI - Rapid prototyping tool for generating containerized backend and frontend CRUD stacks from data files.">
-    <title>Sirius-CLI | Rapid Full-Stack Code Generator</title>
+    <meta name="description" content="Official technical documentation for Sirius-CLI">
+    <title>Sirius-CLI Documentation</title>
     
-    <!-- Fonts: Inter (sans) and JetBrains Mono (code) -->
+    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     
     <link rel="stylesheet" href="style.css">
     <script src="script.js" defer></script>
 </head>
 <body>
-    <div class="background-effects">
-        <div class="glow-orb orb-1"></div>
-        <div class="glow-orb orb-2"></div>
-    </div>
 
-    <nav class="navbar glass">
-        <div class="container nav-content">
-            <div class="logo">
-                <span class="logo-icon">✦</span>
-                <span class="logo-text">Sirius-CLI</span>
-            </div>
-            <ul class="nav-links">
-                <li><a href="#features">Features</a></li>
-                <li><a href="#how-it-works">How It Works</a></li>
-                <li><a href="#quick-start">Quick Start</a></li>
-                <li><a href="#cli">CLI Reference</a></li>
+    <!-- Fixed Sidebar -->
+    <aside class="sidebar">
+        <div class="sidebar-header">
+            <div class="logo">Sirius-CLI <span class="version">v0.2.7</span></div>
+            <button id="theme-toggle" class="theme-btn" aria-label="Toggle Theme">
+                <!-- SVG injected via JS -->
+            </button>
+        </div>
+        <nav class="table-of-contents">
+            <ul>
+                <li><a href="#introduction" class="nav-link">1. Introduction</a></li>
+                <li><a href="#installation" class="nav-link">2. Installation</a></li>
+                <li><a href="#core-concepts" class="nav-link">3. Core Concepts</a>
+                    <ul>
+                        <li><a href="#schema-inference" class="nav-link sub">3.1 Schema Inference</a></li>
+                        <li><a href="#relationship-mapping" class="nav-link sub">3.2 Relationship Mapping</a></li>
+                    </ul>
+                </li>
+                <li><a href="#cli-reference" class="nav-link">4. CLI Reference</a>
+                    <ul>
+                        <li><a href="#init-command" class="nav-link sub">4.1 sirius-init init</a></li>
+                        <li><a href="#update-command" class="nav-link sub">4.2 sirius-init update</a></li>
+                    </ul>
+                </li>
+                <li><a href="#architecture" class="nav-link">5. Architecture Deep Dive</a>
+                    <ul>
+                        <li><a href="#arch-backend" class="nav-link sub">5.1 Backend (FastAPI)</a></li>
+                        <li><a href="#arch-frontend" class="nav-link sub">5.2 Frontend (React)</a></li>
+                        <li><a href="#arch-migrations" class="nav-link sub">5.3 Migrations (Alembic)</a></li>
+                    </ul>
+                </li>
+                <li><a href="#security" class="nav-link">6. Security & Auth</a></li>
             </ul>
-            <div class="nav-actions">
-                <a href="https://github.com/amineaith3/sirius-cli" target="_blank" class="btn btn-ghost">GitHub</a>
-                <a href="https://pypi.org/project/sirius-cli/" target="_blank" class="btn btn-primary">View on PyPI</a>
-            </div>
-        </div>
-    </nav>
+        </nav>
+    </aside>
 
-    <header class="hero container">
-        <div class="hero-content fade-in-up">
-            <h1 class="hero-title">From Data to <span class="gradient-text">Full-Stack App</span> in Seconds.</h1>
-            <p class="hero-subtitle">
-                A rapid prototyping CLI that instantly infers schema from CSVs, Excel, or SQLite and generates a production-ready FastAPI + React 18 stack.
-            </p>
-            <div class="hero-cta">
-                <div class="code-install group">
-                    <span class="prompt">$</span>
-                    <code id="install-cmd">pip install sirius-cli</code>
-                    <button class="copy-btn" data-target="install-cmd" aria-label="Copy to clipboard">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                    </button>
-                </div>
-                <a href="#quick-start" class="btn btn-secondary">Read the Docs</a>
-            </div>
-            <div class="hero-badges">
-                <span class="badge">v0.2.7</span>
-                <span class="badge">Python 3.9+</span>
-                <span class="badge">MIT License</span>
-            </div>
-        </div>
+    <!-- Main Content -->
+    <main class="content">
+        <header class="page-header">
+            <h1>Sirius-CLI Documentation</h1>
+            <p class="subtitle">Technical reference manual for the Sirius rapid prototyping engine.</p>
+        </header>
 
-        <div class="hero-visual glass fade-in-up delay-1">
-            <div class="terminal-header">
-                <span class="dot red"></span>
-                <span class="dot yellow"></span>
-                <span class="dot green"></span>
-                <span class="term-title">bash</span>
-            </div>
-            <div class="terminal-body" id="typewriter-container">
-                <!-- Populated by JS -->
-            </div>
-        </div>
-    </header>
+        <section id="introduction">
+            <h2>1. Introduction</h2>
+            <p><strong>Sirius-CLI</strong> is a rapid application development tool that infers schemas from raw data files (CSV, Excel, SQLite, JSON) and compiles them into a complete, production-ready, containerized full-stack application.</p>
+            <p>Unlike standard boilerplate generators, Sirius-CLI parses your data relationships, handles English pluralization rules automatically, wires up SQL foreign keys, and generates an enterprise-grade React data grid complete with server-side pagination, sorting, search, and CSV/Excel exports.</p>
+        </section>
 
-    <section id="features" class="container">
-        <h2 class="section-title gradient-text text-center">Why Sirius-CLI?</h2>
-        <div class="grid-3">
-            <div class="feature-card glass">
-                <div class="feature-icon">🔍</div>
-                <h3>Intelligent Inference</h3>
-                <p>Automatically maps relationships, resolves irregular English plurals, and identifies primary/foreign keys from raw data.</p>
-            </div>
-            <div class="feature-card glass">
-                <div class="feature-icon">⚡</div>
-                <h3>Production Grade Stack</h3>
-                <p>Scaffolds FastAPI, SQLAlchemy, Pydantic v2, and Alembic migrations. Docker-ready from the first command.</p>
-            </div>
-            <div class="feature-card glass">
-                <div class="feature-icon">🎨</div>
-                <h3>Enterprise React UI</h3>
-                <p>Generates a responsive Vite + Tailwind frontend featuring dynamic relation dropdowns, server-side search, and a dashboard.</p>
-            </div>
-        </div>
-    </section>
+        <section id="installation">
+            <h2>2. Installation</h2>
+            <p>Sirius-CLI is distributed via PyPI. We recommend installing it globally or within a dedicated virtual environment.</p>
+            
+            <h3>Prerequisites</h3>
+            <ul>
+                <li><strong>Python 3.9+</strong> (Required for the CLI tool)</li>
+                <li><strong>Node.js 16+</strong> (Required for running the generated frontend locally)</li>
+                <li><strong>Docker</strong> (Optional, for deploying the generated <code>docker-compose.yml</code>)</li>
+            </ul>
 
-    <section id="how-it-works" class="container">
-        <h2 class="section-title gradient-text">Architecture Pipeline</h2>
-        <div class="pipeline-container glass">
-            <div class="pipeline-step">
-                <div class="step-num">1</div>
-                <h4>Input Data</h4>
-                <p>CSV, Excel, SQLite, or JSON config</p>
-            </div>
-            <div class="pipeline-arrow">➔</div>
-            <div class="pipeline-step">
-                <div class="step-num">2</div>
-                <h4>Schema Engine</h4>
-                <p>Type mapping & FK heuristic resolution</p>
-            </div>
-            <div class="pipeline-arrow">➔</div>
-            <div class="pipeline-step">
-                <div class="step-num">3</div>
-                <h4>Jinja Generator</h4>
-                <p>Renders backend & frontend templates</p>
-            </div>
-            <div class="pipeline-arrow">➔</div>
-            <div class="pipeline-step">
-                <div class="step-num">4</div>
-                <h4>Migration & Seed</h4>
-                <p>Alembic heads up and inserts rows</p>
-            </div>
-        </div>
-    </section>
-
-    <section id="quick-start" class="container">
-        <h2 class="section-title gradient-text">Quick Start Workflows</h2>
-        
-        <div class="tabs-container glass">
-            <div class="tabs-header">
-                <button class="tab-btn active" data-tab="csv">From CSV</button>
-                <button class="tab-btn" data-tab="excel">From Excel</button>
-                <button class="tab-btn" data-tab="db">From Database</button>
-                <button class="tab-btn" data-tab="auth">With Auth</button>
+            <div class="code-block">
+                <pre><code>pip install sirius-cli</code></pre>
+                <button class="copy-btn">Copy</button>
             </div>
             
-            <div class="tab-content active" id="tab-csv">
-                <p>Scaffold a full system by passing one or more CSV files. Sirius will infer relationships if it sees <code>table_id</code> columns.</p>
-                <div class="code-block">
-                    <pre><code id="code-csv">sirius-init init store_system \
-  --csv users.csv \
-  --csv orders.csv \
-  --theme violet</code></pre>
-                    <button class="copy-btn absolute" data-target="code-csv"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>
-                </div>
+            <p>Verify the installation:</p>
+            <div class="code-block">
+                <pre><code>sirius-init --version</code></pre>
+                <button class="copy-btn">Copy</button>
             </div>
+        </section>
 
-            <div class="tab-content" id="tab-excel">
-                <p>Target production databases directly while reading from Excel. This sets up Postgres drivers in the generated project.</p>
-                <div class="code-block">
-                    <pre><code id="code-excel">sirius-init init analytics \
-  --excel data.xlsx \
-  --pg \
-  --theme emerald</code></pre>
-                    <button class="copy-btn absolute" data-target="code-excel"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>
-                </div>
+        <section id="core-concepts">
+            <h2>3. Core Concepts</h2>
+            
+            <h3 id="schema-inference">3.1 Schema Inference</h3>
+            <p>When you pass a CSV or Excel file to Sirius, the engine uses <code>pandas</code> to read the headers and infer standard data types (Strings, Integers, Booleans, Floats). It sanitizes column names into safe SQL identifiers.</p>
+            
+            <h3 id="relationship-mapping">3.2 Relationship Mapping</h3>
+            <p>Sirius-CLI features an intelligent relationship resolver powered by the <code>inflect</code> library. If the engine detects a column ending in <code>_id</code> (e.g., <code>customer_id</code>), it will:</p>
+            <ol>
+                <li>Extract the base name (<code>customer</code>).</li>
+                <li>Resolve the exact English plural (<code>customers</code>).</li>
+                <li>Check if a <code>customers</code> table exists in the current parsing context.</li>
+                <li>If found, it automatically wires a SQLAlchemy Foreign Key and generates React UI dropdowns linking the two tables.</li>
+            </ol>
+            <p>This happens automatically without requiring manual configuration files.</p>
+        </section>
+
+        <section id="cli-reference">
+            <h2>4. CLI Reference</h2>
+            <p>The CLI exposes two primary commands: <code>init</code> and <code>update</code>.</p>
+
+            <h3 id="init-command">4.1 sirius-init init</h3>
+            <p>Used to scaffold a completely new project.</p>
+            <div class="code-block">
+                <pre><code>sirius-init init &lt;project_name&gt; [OPTIONS]</code></pre>
+                <button class="copy-btn">Copy</button>
             </div>
             
-            <div class="tab-content" id="tab-db">
-                <p>Point Sirius at an existing SQLite file. It will reverse-engineer the schema via PRAGMAs and build the REST API around it.</p>
-                <div class="code-block">
-                    <pre><code id="code-db">sirius-init init legacy_app --db old_database.db</code></pre>
-                    <button class="copy-btn absolute" data-target="code-db"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>
-                </div>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Flag</th>
+                            <th>Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td><code>--csv &lt;path&gt;</code></td>
+                            <td>Path to input CSV file. Repeatable for multiple files.</td>
+                        </tr>
+                        <tr>
+                            <td><code>--excel &lt;path&gt;</code></td>
+                            <td>Path to input Excel (.xlsx) file. Repeatable.</td>
+                        </tr>
+                        <tr>
+                            <td><code>--db &lt;path&gt;</code></td>
+                            <td>Path to an existing SQLite database to introspect.</td>
+                        </tr>
+                        <tr>
+                            <td><code>--config, -c</code></td>
+                            <td>Path to a JSON configuration defining explicit schema.</td>
+                        </tr>
+                        <tr>
+                            <td><code>--theme, -t</code></td>
+                            <td>Tailwind theme color. Defaults to <code>blue</code>.</td>
+                        </tr>
+                        <tr>
+                            <td><code>--port, -p</code></td>
+                            <td>Backend port (default 8000). Updates Docker and .env files.</td>
+                        </tr>
+                        <tr>
+                            <td><code>--api-url</code></td>
+                            <td>Overrides the frontend <code>VITE_API_URL</code>. Default points to localhost:port.</td>
+                        </tr>
+                        <tr>
+                            <td><code>--pg, --mysql</code></td>
+                            <td>Generates the project with PostgreSQL or MySQL drivers/pools instead of SQLite.</td>
+                        </tr>
+                        <tr>
+                            <td><code>--auth</code></td>
+                            <td>Generates JWT Bearer authentication, Login UI, and protects API routes.</td>
+                        </tr>
+                        <tr>
+                            <td><code>--admin-user</code></td>
+                            <td>Default admin username (default: admin). Requires <code>--auth</code>.</td>
+                        </tr>
+                        <tr>
+                            <td><code>--admin-pass</code></td>
+                            <td>Default admin password. If omitted, a secure password is auto-generated.</td>
+                        </tr>
+                        <tr>
+                            <td><code>--no-seed</code></td>
+                            <td>Skips inserting rows from source files into the generated SQLite DB.</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
 
-            <div class="tab-content" id="tab-auth">
-                <p>Generate a secure project with JWT authentication. Automatically creates Login screens and protects API routes.</p>
-                <div class="code-block">
-                    <pre><code id="code-auth">sirius-init init secure_admin \
-  --config schema.json \
-  --auth \
-  --admin-user admin \
-  --admin-pass super_secret</code></pre>
-                    <button class="copy-btn absolute" data-target="code-auth"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg></button>
-                </div>
+            <h3 id="update-command">4.2 sirius-init update</h3>
+            <p>Used to inject new tables or columns into an existing project. It safely regenerates models, schemas, and UI, and automatically runs an Alembic autogenerate migration.</p>
+            <div class="code-block">
+                <pre><code>sirius-init update &lt;project_path&gt; [OPTIONS]</code></pre>
+                <button class="copy-btn">Copy</button>
             </div>
-        </div>
-    </section>
+            <p><em>Accepts the same input flags (`--csv`, `--db`, etc.) as the init command, plus `-m` for custom migration messages.</em></p>
+        </section>
 
-    <section id="cli" class="container">
-        <h2 class="section-title gradient-text">CLI Reference</h2>
-        <div class="table-wrapper glass">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Flag</th>
-                        <th>Description</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td><code>--csv &lt;path&gt;</code></td>
-                        <td>Path to input CSV file. Can be declared multiple times.</td>
-                    </tr>
-                    <tr>
-                        <td><code>--excel &lt;path&gt;</code></td>
-                        <td>Path to input Excel (.xlsx) file. Can be declared multiple times.</td>
-                    </tr>
-                    <tr>
-                        <td><code>--db &lt;path&gt;</code></td>
-                        <td>Path to a SQLite database to introspect.</td>
-                    </tr>
-                    <tr>
-                        <td><code>--config, -c</code></td>
-                        <td>Path to JSON configuration defining explicit schema.</td>
-                    </tr>
-                    <tr>
-                        <td><code>--theme, -t</code></td>
-                        <td>Frontend Tailwind theme (blue, indigo, emerald, amber, rose, sky, violet). Default: blue.</td>
-                    </tr>
-                    <tr>
-                        <td><code>--pg, --mysql</code></td>
-                        <td>Generate project tailored for PostgreSQL or MySQL databases instead of SQLite.</td>
-                    </tr>
-                    <tr>
-                        <td><code>--auth</code></td>
-                        <td>Generate JWT Bearer token authentication and Login UI.</td>
-                    </tr>
-                    <tr>
-                        <td><code>--no-seed</code></td>
-                        <td>Skip automatically inserting rows from source files into the generated DB.</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-    </section>
+        <section id="architecture">
+            <h2>5. Architecture Deep Dive</h2>
+            <p>Sirius-CLI does not hide its generated code behind abstraction layers. It outputs raw, standard Python and TypeScript files that you own and can edit freely.</p>
 
-    <footer class="footer">
-        <div class="container footer-content">
-            <div class="footer-brand">
-                <div class="logo">
-                    <span class="logo-icon">✦</span>
-                    <span class="logo-text">Sirius-CLI</span>
-                </div>
-                <p>Rapid prototyping framework.</p>
-                <p class="license">Licensed under AGPLv3. Designed for developers.</p>
+            <h3 id="arch-backend">5.1 Backend (FastAPI)</h3>
+            <ul>
+                <li><strong><code>main.py</code></strong>: The core FastAPI router. Automatically generates fully functional CRUD endpoints for every table. Includes server-side <code>?search=</code> and <code>?order_by=</code> handlers, and <code>/export</code> endpoints generating CSVs and Excel files.</li>
+                <li><strong><code>database.py</code></strong>: Configures the SQLAlchemy <code>SessionLocal</code> pool. For Postgres/MySQL, it enforces reading the connection string from the <code>DATABASE_URL</code> environment variable.</li>
+                <li><strong><code>models.py</code></strong>: Generates strict SQLAlchemy declarative base models with correct foreign key mappings and indexes.</li>
+                <li><strong><code>schemas.py</code></strong>: Generates Pydantic v2 models (Create, Update, Response) for strict request validation and serialization.</li>
+            </ul>
+
+            <h3 id="arch-frontend">5.2 Frontend (React + Vite)</h3>
+            <ul>
+                <li><strong><code>TableCrud.tsx</code></strong>: The workhorse of the UI. A massive component generated per-table that handles data fetching, sorting, searching, pagination, and Create/Update modals. It resolves Foreign Keys into clickable badges.</li>
+                <li><strong><code>Dashboard.tsx</code></strong>: Integrates Recharts to provide a dynamic overview of table row counts and schema structure.</li>
+            </ul>
+
+            <h3 id="arch-migrations">5.3 Migrations (Alembic)</h3>
+            <p>During scaffolding, Sirius initializes Alembic in the backend directory. It writes the `env.py` to target your specific database, runs <code>alembic revision --autogenerate</code> to snapshot the initial models, and executes <code>alembic upgrade head</code> to create the physical tables.</p>
+        </section>
+
+        <section id="security">
+            <h2>6. Security & Authentication</h2>
+            
+            <h3>JWT Implementation</h3>
+            <p>When the <code>--auth</code> flag is provided, Sirius generates an <code>auth.py</code> file containing OAuth2 Password Bearer logic via <code>python-jose</code> and <code>passlib</code>. All standard endpoints in <code>main.py</code> are subsequently injected with a <code>Depends(get_current_user)</code> dependency.</p>
+            
+            <h3>Production Checklist</h3>
+            <div class="alert warning">
+                <strong>Important:</strong> Generated projects are scaffolds and must be secured before deploying to production.
             </div>
-            <div class="footer-links">
-                <a href="https://github.com/amineaith3/sirius-cli" target="_blank">GitHub Repository</a>
-                <a href="https://pypi.org/project/sirius-cli/" target="_blank">PyPI Package</a>
-                <a href="https://github.com/amineaith3" target="_blank">Creator Profile</a>
-            </div>
-        </div>
-    </footer>
+            <ul>
+                <li><strong>SECRET_KEY</strong>: The JWT token generation relies on a <code>SECRET_KEY</code> environment variable. If omitted, the server generates a random key on startup, which will invalidate all user sessions upon server restart.</li>
+                <li><strong>Database Credentials</strong>: If you generated a Postgres or MySQL project, the <code>database.py</code> file contains placeholder credentials. You must pass a valid <code>DATABASE_URL</code> via environment variables.</li>
+                <li><strong>CORS Origins</strong>: The generated <code>main.py</code> restricts CORS to `localhost:5173` and the explicitly configured `--api-url`. Ensure your production frontend domain is added to <code>_allowed_origins</code>.</li>
+            </ul>
+        </section>
+
+        <footer class="docs-footer">
+            <p>Sirius-CLI is licensed under AGPLv3. Designed for developers.</p>
+        </footer>
+    </main>
+
 </body>
 </html>
