@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
-## [0.2.7] — Unreleased
+## [0.2.7] — 2026-07-08
 
 ### 🔒 Security
 - **CRITICAL**: Replaced hardcoded JWT secret key with environment variable (`SECRET_KEY`) + auto-generated fallback with startup warning
@@ -37,14 +37,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
-## [0.2.6] — 2026-07-06
+## [0.2.6] — 2026-07-07
 
 ### Added
 - `--version` / `-v` flag to display installed version
 
 ---
 
-## [0.2.5] — 2026-07-05
+## [0.2.5] — 2026-07-07
 
 ### Added
 - `inflect` library integration for FK heuristic plural resolution (replaces hand-rolled engine)
@@ -53,7 +53,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
-## [0.2.4] — 2026-07-04
+## [0.2.4] — 2026-07-07
 
 ### Added
 - Documentation directory (`docs/`)
@@ -64,7 +64,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
-## [0.2.3] — 2026-07-03
+## [0.2.3] — 2026-07-06
 
 ### Added
 - PyPI distribution via GitHub Actions (OIDC trusted publishing)
@@ -72,7 +72,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
-## [0.2.0] — 2026-07-01
+## [0.2.0] — 2026-07-06
 
 ### Added
 - JWT authentication scaffold (`--auth`, `--admin-user`, `--admin-pass`)
@@ -85,7 +85,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
-## [0.1.0] — 2026-06-28
+## [0.1.0] — 2026-07-06
 
 ### Added
 - Initial release
