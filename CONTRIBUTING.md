@@ -20,7 +20,7 @@ Thank you for your interest in contributing to Sirius-CLI! This document provide
 
 3. **Install in development mode:**
    ```bash
-   pip install -e .
+   pip install -e .[dev]
    ```
 
 4. **Verify the installation:**
@@ -64,8 +64,9 @@ sirius_cli/
 
 2. **Make your changes** — follow the existing code style
 
-3. **Test your changes** by scaffolding a project:
+3. **Test your changes** by running the automated test suite and manually scaffolding a test project:
    ```bash
+   pytest tests/ -v
    sirius-init init test_project --csv examples/users.csv --csv examples/orders.csv
    ```
 
@@ -83,7 +84,7 @@ sirius_cli/
 
 ### Areas Where Help Is Welcome
 
-- **Test suite**: We currently have no automated tests — adding `pytest` tests for the parser, generator, and CLI would be extremely valuable
+- **Test suite expansion**: We recently added a `pytest` suite for the parser, generator, and CLI. Adding more test cases for edge cases or edge-case CSVs is always welcome!
 - **Template improvements**: Better error messages, accessibility, responsive design in generated frontends
 - **Documentation**: Improving the docs, adding examples, writing tutorials
 - **New input parsers**: Support for YAML, TOML, or remote database connections

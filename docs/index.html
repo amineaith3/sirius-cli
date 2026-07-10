@@ -19,7 +19,7 @@
     <!-- Fixed Sidebar -->
     <aside class="sidebar">
         <div class="sidebar-header">
-            <div class="logo">Sirius-CLI <span class="version">v0.2.7</span></div>
+            <div class="logo">Sirius-CLI <span class="version">v0.2.8</span></div>
             <button id="theme-toggle" class="theme-btn" aria-label="Toggle Theme">
                 <!-- SVG injected via JS -->
             </button>
@@ -53,6 +53,7 @@
                     <ul>
                         <li><a href="#init-command" class="nav-link sub">4.1 sirius-init init</a></li>
                         <li><a href="#update-command" class="nav-link sub">4.2 sirius-init update</a></li>
+                        <li><a href="#preview-command" class="nav-link sub">4.3 sirius-init preview</a></li>
                     </ul>
                 </li>
                 <li><a href="#architecture" class="nav-link">5. Architecture Deep Dive</a>
@@ -199,6 +200,14 @@
                 <button class="copy-btn">Copy</button>
             </div>
             <p><em>Accepts the same input flags (`--csv`, `--db`, etc.) as the init command, plus `-m` for custom migration messages.</em></p>
+
+            <h3 id="preview-command">4.3 sirius-init preview</h3>
+            <p>Provides an instant, ephemeral way to visualize your inferred data schemas and UI without writing a single file to disk. The engine creates an in-memory SQLite database, constructs a dynamic FastAPI router on the fly, and serves a beautiful Vue 3 + Tailwind CSS frontend interface directly from the CLI.</p>
+            <div class="code-block">
+                <pre><code>sirius-init preview [OPTIONS]</code></pre>
+                <button class="copy-btn">Copy</button>
+            </div>
+            <p><em>Accepts `--csv`, `--excel`, and `--db` flags for data input, plus `--port` to specify the local server port.</em></p>
         </section>
 
         <section id="architecture">
