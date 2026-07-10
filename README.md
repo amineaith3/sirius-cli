@@ -103,6 +103,16 @@ sirius-init init secure_system --csv examples/users.csv --auth --admin-user "sup
 
 ---
 
+## Usage: Instant Preview (`sirius-init preview`)
+
+Want to see how your app looks before generating hundreds of files? Use the preview command to instantly spin up an in-memory database, dynamic API, and Vue 3 frontend in your browser!
+
+```bash
+sirius-init preview --csv examples/users.csv --port 8765
+```
+
+---
+
 ## Usage: Updating an Existing Project (`sirius-init update`)
 
 If your data requirements change (e.g., adding a `reviews` table to your store), you don't need to start from scratch. Use the `update` command to merge new schemas into an existing project.
@@ -120,7 +130,7 @@ Sirius-CLI will:
 
 ## All CLI Flags
 
-### `sirius-init init` / `sirius-init update`
+### `sirius-init init` / `sirius-init update` / `sirius-init preview`
 
 | Flag | Short | Default | Description |
 |---|---|---|---|

@@ -4,6 +4,7 @@ import sqlite3
 import json
 import pandas as pd
 import inflect
+from typing import List, Dict, Any, Tuple
 
 _inflect = inflect.engine()
 
@@ -27,12 +28,12 @@ def sanitize_table_name(name: str) -> str:
 
 def sanitize_column_name(name: str) -> str:
     """Sanitizes column name to a valid SQL/python attribute name."""
-    sanitized = re.sub(r'[^a-zA-Z0-9_]', '_', str(name)).lower()
+    sanitized = re.sub(r'[^a-zA-Z0-9_]', '_', name).lower()
     if sanitized and sanitized[0].isdigit():
         sanitized = "_" + sanitized
     return sanitized or "column"
 
-def map_pandas_type(dtype, sample_values) -> str:
+def map_pandas_type(dtype: Any, sample_values: List[Any]) -> str:
     """Maps Pandas dtype to standard string types: Integer, Float, Boolean, DateTime, String."""
     if pd.api.types.is_integer_dtype(dtype):
         return "Integer"
@@ -54,7 +55,7 @@ def map_pandas_type(dtype, sample_values) -> str:
                     pass
         return "String"
 
-def parse_config_file(config_path: str):
+def parse_config_file(config_path: str) -> Tuple[Dict[str, List[Dict[str, Any]]], str, str]:
     """Loads entities and schemas directly from a JSON configuration file."""
     with open(config_path, "r", encoding="utf-8") as f:
         config = json.load(f)
@@ -96,7 +97,7 @@ def parse_config_file(config_path: str):
         
     return schemas, project_name, theme
 
-def parse_csv_files(csv_paths: list) -> dict:
+def parse_csv_files(csv_paths: List[str]) -> Dict[str, List[Dict[str, Any]]]:
     """Parses list of CSV paths, extracts schema types and infers relationships."""
     schemas = {}
     for path in csv_paths:
@@ -104,7 +105,13 @@ def parse_csv_files(csv_paths: list) -> dict:
             raise FileNotFoundError(f"CSV file not found: {path}")
         
         table_name = sanitize_table_name(path)
-        df = pd.read_csv(path, nrows=100)
+        try:
+            df = pd.read_csv(path, nrows=100, encoding='utf-8')
+        except UnicodeDecodeError:
+            try:
+                df = pd.read_csv(path, nrows=100, encoding='utf-16')
+            except UnicodeDecodeError:
+                df = pd.read_csv(path, nrows=100, encoding='cp1252')
         
         columns = []
         has_id = False
@@ -128,8 +135,9 @@ def parse_csv_files(csv_paths: list) -> dict:
     table_names = list(schemas.keys())
     for table_name, columns in schemas.items():
         for col in columns:
-            if col["name"].endswith("_id") and col["name"] != "id":
-                prefix = col["name"][:-3]  # strip '_id'
+            col_name = str(col["name"])
+            if col_name.endswith("_id") and col_name != "id":
+                prefix = col_name[:-3]  # strip '_id'
                 matched_table = None
                 for t in table_names:
                     # Try exact match, then common plural/singular variants
@@ -148,7 +156,7 @@ def parse_csv_files(csv_paths: list) -> dict:
                     
     return schemas
 
-def parse_excel_files(excel_paths: list) -> dict:
+def parse_excel_files(excel_paths: List[str]) -> Dict[str, List[Dict[str, Any]]]:
     """Parses list of Excel (.xlsx/.xls) paths, extracts schema types and infers relationships."""
     schemas = {}
     for path in excel_paths:
@@ -162,7 +170,7 @@ def parse_excel_files(excel_paths: list) -> dict:
         has_id = False
 
         for col in df.columns:
-            san_col = sanitize_column_name(str(col))
+            san_col = sanitize_column_name(col)
             col_type = map_pandas_type(df[col].dtype, df[col].dropna().head(5).tolist())
 
             if san_col == "id":
@@ -180,8 +188,9 @@ def parse_excel_files(excel_paths: list) -> dict:
     table_names = list(schemas.keys())
     for table_name, columns in schemas.items():
         for col in columns:
-            if col["name"].endswith("_id") and col["name"] != "id":
-                prefix = col["name"][:-3]
+            col_name = str(col["name"])
+            if col_name.endswith("_id") and col_name != "id":
+                prefix = col_name[:-3]
                 matched_table = None
                 for t in table_names:
                     candidates = {
@@ -213,7 +222,7 @@ def map_sqlite_type(sqlite_type: str) -> str:
     else:
         return "String"
 
-def parse_sqlite_db(db_path: str) -> dict:
+def parse_sqlite_db(db_path: str) -> Dict[str, List[Dict[str, Any]]]:
     """Parses SQLite database extracting user tables and foreign key constraints."""
     if not os.path.exists(db_path):
         raise FileNotFoundError(f"SQLite database file not found: {db_path}")

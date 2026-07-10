@@ -10,6 +10,7 @@ from typing import List, Optional
 import importlib.metadata
 from sirius_cli.parser import parse_csv_files, parse_sqlite_db, parse_config_file, parse_excel_files, sanitize_table_name, sanitize_column_name
 from sirius_cli.generator import generate_project, render_alembic_files
+from sirius_cli.preview import run_preview
 
 app = typer.Typer(help="Sirius-CLI: A rapid prototyping backend and frontend code generator.")
 
@@ -25,7 +26,7 @@ def _quote_ident(name: str) -> str:
         raise ValueError(f"Invalid SQL identifier: {name!r}")
     return f'"{name}"'
 
-def _find_alembic() -> str:
+def _find_alembic() -> Optional[str]:
     """Locate the alembic executable, preferring the one in the current Python environment."""
     import shutil
     alembic_path = shutil.which("alembic")
@@ -34,7 +35,7 @@ def _find_alembic() -> str:
     # Fallback: try running via python -m alembic
     return None
 
-def _run_alembic(args: list, cwd: str, env: dict = None):
+def _run_alembic(args: list, cwd: str, env: Optional[dict] = None):
     """Run an alembic command safely without shell=True."""
     alembic_path = _find_alembic()
     if alembic_path:
@@ -99,12 +100,22 @@ def seed_database_from_csvs(project_path: str, csv_paths: list):
             except Exception:
                 continue
         else:
-            with open(path, "r", encoding="utf-8") as f:
-                reader = csv.DictReader(f)
-                if not reader.fieldnames:
+            encodings_to_try = ['utf-8', 'utf-16', 'cp1252']
+            fieldnames = []
+            all_rows = []
+            for enc in encodings_to_try:
+                try:
+                    with open(path, "r", encoding=enc) as f:
+                        reader = csv.DictReader(f)
+                        if reader.fieldnames:
+                            fieldnames = list(reader.fieldnames)
+                            all_rows = list(reader)
+                    break
+                except UnicodeDecodeError:
                     continue
-                fieldnames = list(reader.fieldnames)
-                all_rows = list(reader)
+            
+            if not fieldnames:
+                continue
             
         table_name = sanitize_table_name(path)
         cols = [sanitize_column_name(c) for c in fieldnames]
@@ -213,7 +224,7 @@ def init(
             if not project_name:
                 typer.secho("Error: Project name argument is required when using --db.", fg=typer.colors.RED, err=True)
                 raise typer.Exit(code=1)
-        else:  # config
+        elif config:  # config
             schemas, cfg_project_name, cfg_theme = parse_config_file(config)
             resolved_theme = theme or cfg_theme
             project_name = project_name or cfg_project_name
@@ -223,6 +234,9 @@ def init(
     except Exception as e:
         typer.secho(f"Error parsing schemas: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
+
+    assert project_name is not None
+    assert admin_pass is not None
         
     dest_dir = os.path.abspath(os.path.join(out, project_name))
     typer.echo(f"Scaffolding project in: {dest_dir} (Theme: {resolved_theme}, Port: {port}, DB: {db_type})")
@@ -318,7 +332,7 @@ def update(
     db: Optional[str] = typer.Option(None, "--db", help="Path to input SQLite db"),
     config: Optional[str] = typer.Option(None, "--config", "-c", help="Path to JSON config"),
     message: str = typer.Option("Auto-update schema", "-m", help="Alembic migration message"),
-    theme: Optional[str] = typer.Option("blue", "--theme", "-t", help="Color theme for the frontend (defaults to blue)"),
+    theme: str = typer.Option("blue", "--theme", "-t", help="Color theme for the frontend (defaults to blue)"),
     port: int = typer.Option(8000, "--port", "-p", help="Backend server port (used in docker-compose and .env)"),
     api_url: Optional[str] = typer.Option(None, "--api-url", help="Override the frontend VITE_API_URL (default: http://localhost:<port>)"),
     pg: bool = typer.Option(False, "--pg", help="Use PostgreSQL instead of SQLite"),
@@ -361,7 +375,7 @@ def update(
             schemas = parse_excel_files(excel)
         elif db:
             schemas = parse_sqlite_db(db)
-        else:  # config
+        elif config:  # config
             schemas, _, _ = parse_config_file(config)
     except Exception as e:
         typer.secho(f"Error parsing schemas: {e}", fg=typer.colors.RED, err=True)
@@ -371,6 +385,7 @@ def update(
     project_name = os.path.basename(os.path.abspath(project_path))
 
     typer.echo(f"Updating project in: {project_path}")
+    assert admin_pass is not None
     try:
         generate_project(
             project_path, schemas, project_name=project_name, theme=theme, port=port, api_url=resolved_api_url, 
@@ -397,6 +412,37 @@ def update(
         typer.echo("You can configure database credentials and run migrations manually later.")
 
     typer.secho(f"\n[SUCCESS] Project '{project_path}' has been updated.", fg=typer.colors.GREEN, bold=True)
+
+@app.command()
+def preview(
+    csv: Optional[List[str]] = typer.Option(None, "--csv", help="Paths to input CSV files"),
+    excel: Optional[List[str]] = typer.Option(None, "--excel", help="Paths to input Excel files"),
+    db: Optional[str] = typer.Option(None, "--db", help="Path to input SQLite db"),
+    config: Optional[str] = typer.Option(None, "--config", "-c", help="Path to JSON config"),
+    port: int = typer.Option(8765, "--port", "-p", help="Port for the preview server")
+):
+    """Instantly preview a generated UI based on schema sources without creating files."""
+    inputs = [bool(csv), bool(excel), bool(db), bool(config)]
+    if sum(inputs) != 1:
+        typer.secho("Error: You must provide exactly one input option: --csv, --excel, --db, or --config.", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1)
+
+    typer.echo("Parsing schemas for preview...")
+    try:
+        if csv:
+            schemas = parse_csv_files(csv)
+        elif excel:
+            schemas = parse_excel_files(excel)
+        elif db:
+            schemas = parse_sqlite_db(db)
+        elif config:  # config
+            schemas, _, _ = parse_config_file(config)
+    except Exception as e:
+        typer.secho(f"Error parsing schemas: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(code=1)
+
+    typer.echo(f"Starting preview server...")
+    run_preview(schemas, port=port, db_path=db, csv_paths=csv, excel_paths=excel)
 
 if __name__ == "__main__":
     app()

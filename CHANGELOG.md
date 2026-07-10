@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [0.2.8] — 2026-07-10
+
+### Added
+- `sirius-init preview` command for instant, ephemeral scaffolding without generating files
+- In-memory SQLite generation combined with dynamic FastAPI and Pydantic models for live previewing
+- Beautiful Vue 3 + Tailwind CSS frontend preview UI rendered directly from the CLI
+
+---
+
 ## [0.2.7] — 2026-07-08
 
 ### 🔒 Security
