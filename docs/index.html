@@ -19,7 +19,7 @@
     <!-- Fixed Sidebar -->
     <aside class="sidebar">
         <div class="sidebar-header">
-            <div class="logo">Sirius-CLI <span class="version">v0.2.8</span></div>
+            <div class="logo">Sirius-CLI <span class="version">v0.3.0</span></div>
             <button id="theme-toggle" class="theme-btn" aria-label="Toggle Theme">
                 <!-- SVG injected via JS -->
             </button>
@@ -47,6 +47,10 @@
                     <ul>
                         <li><a href="#schema-inference" class="nav-link sub">3.1 Schema Inference</a></li>
                         <li><a href="#relationship-mapping" class="nav-link sub">3.2 Relationship Mapping</a></li>
+                        <li><a href="#form-validation" class="nav-link sub">3.3 Dynamic Form Validation</a></li>
+                        <li><a href="#server-side-operations" class="nav-link sub">3.4 Server-Side Search & Sorting</a></li>
+                        <li><a href="#relationship-navigation" class="nav-link sub">3.5 Relationship Navigation</a></li>
+                        <li><a href="#data-export" class="nav-link sub">3.6 Data Exporting</a></li>
                     </ul>
                 </li>
                 <li><a href="#cli-reference" class="nav-link">4. CLI Reference</a>
@@ -119,6 +123,31 @@
                 <li>If found, it automatically wires a SQLAlchemy Foreign Key and generates React UI dropdowns linking the two tables.</li>
             </ol>
             <p>This happens automatically without requiring manual configuration files.</p>
+
+            <h3 id="form-validation">3.3 Dynamic Form Validation</h3>
+            <p>Generated React CRUD forms are strictly validated based on inferred data constraints natively via HTML5:</p>
+            <ul>
+                <li><strong>Required Fields:</strong> Reads <code>NOT NULL</code> constraints via <code>PRAGMA table_info</code> (SQLite) or infers <code>isnull()</code> heuristics (Pandas) to automatically inject <code>required</code> attributes.</li>
+                <li><strong>Numeric Bounds:</strong> Extracts <code>min</code> and <code>max</code> extremes from CSV/Excel data and sets them on numeric inputs.</li>
+                <li><strong>Email Regex:</strong> Automatically tags column names containing "email" with <code>type="email"</code>.</li>
+            </ul>
+
+            <h3 id="server-side-operations">3.4 Server-Side Search & Sorting</h3>
+            <p>Sirius-CLI does not rely on fragile client-side filtering. Instead:</p>
+            <ul>
+                <li><strong>Search:</strong> A debounced (350ms) search input fires a <code>?search=</code> query. The FastAPI backend queries the database using standard wildcard string matching across all text fields.</li>
+                <li><strong>Sorting:</strong> Clicking table headers toggles a server-side <code>?order_by=</code> and <code>?dir=</code> API request.</li>
+            </ul>
+
+            <h3 id="relationship-navigation">3.5 Relationship Navigation</h3>
+            <p>Generated applications feel like fully fleshed-out enterprise admins rather than raw data grids:</p>
+            <ul>
+                <li><strong>Label Resolution:</strong> Foreign Key IDs (e.g., <code>User #4</code>) are transparently resolved to human-readable names (e.g., <code>alice@example.com</code> or <code>Alice</code>) using zero-cost state lookups.</li>
+                <li><strong>Highlight Navigation:</strong> Clicking a Foreign Key badge instantly routes the user to the parent record (<code>?highlight=ID</code>). The target row is automatically scrolled into view and flashes with a brand-colored pulse animation to anchor the user's context.</li>
+            </ul>
+
+            <h3 id="data-export">3.6 Data Exporting</h3>
+            <p>Every generated data table features one-click bulk exports directly to standard formats. The FastAPI backend streams the entire current dataset matching active search and sort parameters directly to the browser as either a <code>.csv</code> or binary <code>.xlsx</code> (Excel) file.</p>
         </section>
 
         <section id="cli-reference">

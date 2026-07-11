@@ -77,9 +77,14 @@ sirius_cli/
 
 ### Code Style
 
-- Python files: Follow PEP 8 conventions
+- **Strict PEP 8 Enforcement**: All Python files must be formatted with `black` and linted with `flake8`. PRs will fail CI if they do not comply.
+- **Pre-commit Hooks**: We strongly recommend installing pre-commit hooks to automatically format your code before committing:
+  ```bash
+  pip install pre-commit
+  pre-commit install
+  ```
 - Jinja2 templates: Match the existing template formatting style
-- Use type hints where applicable
+- Use type hints where applicable (`mypy` is enforced in CI)
 - Preserve existing comments and docstrings
 
 ### Areas Where Help Is Welcome

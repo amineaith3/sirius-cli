@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [0.3.0] — 2026-07-11
+
+### Added
+- Dynamic form validation in generated React apps (infers `required`, `min`, `max` from data sources)
+
+### Fixed
+- Fixed Flake8 and formatting issues across the codebase
+- Fixed MyPy type checking errors and configuration
+
+---
+
 ## [0.2.8] — 2026-07-10
 
 ### Added

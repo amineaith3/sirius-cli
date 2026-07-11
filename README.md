@@ -26,6 +26,7 @@ Before using Sirius-CLI, ensure you have the following installed:
 - **Automatic Relationship Mapping**: Automatically extracts foreign keys from databases and resolves CSV/Excel associations using naming heuristics (linking `[table]_id` fields), navigating irregular English plurals effortlessly.
 - **Auto-Seeding**: Automatically seeds the generated database with the entries inside the source CSV/Excel files during migration (if using SQLite).
 - **Relational Integrity**: Generates dropdowns in the UI for foreign keys and displays badges that navigate to parent entities.
+- **Native Form Validation**: Injects strict HTML5 `required`, `min`, `max`, and `type="email"` validation constraints into the generated frontend by directly inferring them from the source data (via SQLite `PRAGMAs` or Pandas null-checks).
 - **Enterprise Data Grid**: The generated tables feature server-side searching (`?search=`), server-side column sorting (`?order_by=`), and dual data export buttons (CSV and Excel `.xlsx`).
 - **Dashboard Analytics**: A built-in Recharts dashboard showing live dataset distribution and entity insights.
 - **Multiple Database Engines**: Target `SQLite` for rapid local prototyping, or generate `PostgreSQL` and `MySQL` ready projects out of the box using `--pg` and `--mysql`.
@@ -186,6 +187,14 @@ docker compose up --build
 | **WSL2** | Fully supported |
 
 **Python**: Requires **3.9 or higher**.
+
+---
+
+## Contributing
+
+We welcome contributions! Please see our [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to set up your local development environment and run tests.
+
+**Note**: All incoming Pull Requests must pass strict PEP8 formatting and linting via `black` and `flake8`, and type-checking via `mypy`. We recommend installing our pre-commit hooks.
 
 ---
 

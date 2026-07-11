@@ -518,7 +518,7 @@ export default function {{ table_name.replace('_', ' ').title().replace(' ', '')
                   name="{{ col.name }}"
                   value={formData.{{ col.name }} !== undefined && formData.{{ col.name }} !== null ? formData.{{ col.name }} : ''}
                   onChange={handleInputChange}
-                  required
+                  {% if col.is_required %}required{% endif %}
                   className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs focus:border-brand-500 focus:outline-none text-slate-200 transition-colors w-full"
                 >
                   <option value="">Select {{ target_table.replace('_', ' ') }}</option>
@@ -552,11 +552,12 @@ export default function {{ table_name.replace('_', ' ').title().replace(' ', '')
                 <input
                   type="number"
                   step="1"
-                  min="0"
+                  {% if col.min_val is defined %}min="{{ col.min_val }}"{% endif %}
+                  {% if col.max_val is defined %}max="{{ col.max_val }}"{% endif %}
                   name="{{ col.name }}"
                   value={formData.{{ col.name }} !== undefined && formData.{{ col.name }} !== null ? formData.{{ col.name }} : ''}
                   onChange={handleInputChange}
-                  required
+                  {% if col.is_required %}required{% endif %}
                   className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs focus:border-brand-500 focus:outline-none text-slate-200 transition-colors"
                 />
 
@@ -564,11 +565,12 @@ export default function {{ table_name.replace('_', ' ').title().replace(' ', '')
                 <input
                   type="number"
                   step="any"
-                  min="0"
+                  {% if col.min_val is defined %}min="{{ col.min_val }}"{% endif %}
+                  {% if col.max_val is defined %}max="{{ col.max_val }}"{% endif %}
                   name="{{ col.name }}"
                   value={formData.{{ col.name }} !== undefined && formData.{{ col.name }} !== null ? formData.{{ col.name }} : ''}
                   onChange={handleInputChange}
-                  required
+                  {% if col.is_required %}required{% endif %}
                   className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs focus:border-brand-500 focus:outline-none text-slate-200 transition-colors"
                 />
 
@@ -578,7 +580,7 @@ export default function {{ table_name.replace('_', ' ').title().replace(' ', '')
                   name="{{ col.name }}"
                   value={formData.{{ col.name }} || ''}
                   onChange={handleInputChange}
-                  required
+                  {% if col.is_required %}required{% endif %}
                   className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs focus:border-brand-500 focus:outline-none text-slate-200 transition-colors"
                 />
 
@@ -588,7 +590,7 @@ export default function {{ table_name.replace('_', ' ').title().replace(' ', '')
                   name="{{ col.name }}"
                   value={formData.{{ col.name }} || ''}
                   onChange={handleInputChange}
-                  required
+                  {% if col.is_required %}required{% endif %}
                   className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs focus:border-brand-500 focus:outline-none text-slate-200 transition-colors"
                 />
                 {% endif %}

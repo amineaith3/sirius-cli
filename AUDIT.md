@@ -77,6 +77,7 @@ The `update` command regenerates backend and frontend for new tables/columns add
 | PyPI distribution via GitHub Actions | ✅ Working |
 | Documentation Website | ✅ Built & Live on GH Pages (v0.2.7) |
 | Community Standards (SECURITY/CONTRIBUTING/CHANGELOG) | ✅ Added in v0.2.7 |
+| Form validation (HTML5 required, min, max, email) | ✅ Added in v0.2.9 (Unreleased) |
 | In-memory Live Preview (`sirius-preview`) | ✅ Working (v0.2.8) |
 | Comprehensive Automated Test Suite (`pytest`) | ✅ Working (v0.2.8) |
 
@@ -86,19 +87,13 @@ The `update` command regenerates backend and frontend for new tables/columns add
 
 | Issue | Severity | Impact |
 |---|---|---|
-| No form-level validation beyond `required` | Medium | Data quality — no email pattern, no min/max on numbers |
+| No complex regex validation | Low | Email relies on basic HTML5 `type="email"` without strict regex |
 
 ---
 
 ## Roadmap: How to Move Forward
 
 Prioritized by value-to-effort ratio:
-
-### Tier 1 — Immediate Wins (1-2 days each)
-
-| # | Feature | Why |
-|---|---|---|
-| 1 | **Form validation** | Add `required`, `type="email"`, `min/max` to generated form inputs. Prevents bad data from reaching the API. |
 
 ### Tier 2 — High-Impact Features (3-5 days each)
 
