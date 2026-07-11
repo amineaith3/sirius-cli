@@ -54,11 +54,7 @@ Thumbs.db
 
 # Audit / Planning files
 *audit.md
-AUDIT.md
-DO_NOT_FORGET.md
+PLAN.md
 
 # AI Artifacts
-implementation_plan.md
-flask_implementation_plan.md
-task.md
-walkthrough.md
+.gemini/
