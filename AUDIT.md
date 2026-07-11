@@ -1,4 +1,4 @@
-# Sirius-CLI — Full Audit (v0.3.0)
+# Sirius-CLI — Full Audit (v0.3.1)
 
 ## What It Is
 
@@ -58,7 +58,7 @@ The `update` command regenerates backend and frontend for new tables/columns add
 
 ---
 
-## Current State (v0.3.0)
+## Current State (v0.3.1)
 
 | Feature | Status |
 |---|---|
