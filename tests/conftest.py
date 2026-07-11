@@ -29,20 +29,17 @@ def sample_sqlite_db(tmp_path):
     cursor = conn.cursor()
 
     # Create products table
-    cursor.execute(
-        """
+    cursor.execute("""
         CREATE TABLE products (
             id INTEGER PRIMARY KEY,
             name TEXT NOT NULL,
             price REAL,
             in_stock INTEGER
         )
-    """
-    )
+    """)
 
     # Create orders table with foreign key
-    cursor.execute(
-        """
+    cursor.execute("""
         CREATE TABLE orders (
             id INTEGER PRIMARY KEY,
             order_ref TEXT NOT NULL,
@@ -50,8 +47,7 @@ def sample_sqlite_db(tmp_path):
             quantity INTEGER,
             FOREIGN KEY (product_id) REFERENCES products (id)
         )
-    """
-    )
+    """)
 
     # Insert mock data
     cursor.execute(
