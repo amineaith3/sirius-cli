@@ -60,7 +60,10 @@ def test_parse_sqlite_db(sample_sqlite_db):
     products = schemas["products"]
     assert any(c["name"] == "id" and c["is_pk"] is True for c in products)
     assert any(c["name"] == "name" and c.get("is_required") is True for c in products)
-    assert any(c["name"] == "price" and c["type"] == "Float" and c.get("is_required") is False for c in products)
+    assert any(
+        c["name"] == "price" and c["type"] == "Float" and c.get("is_required") is False
+        for c in products
+    )
 
     # Orders table foreign key validation
     orders = schemas["orders"]
