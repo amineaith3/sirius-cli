@@ -1,9 +1,10 @@
 import io
 import json
+import base64
 from fastapi import FastAPI, Depends, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse, JSONResponse
-from sqlalchemy import or_, cast, String as SAString, desc as sa_desc, asc as sa_asc
+from sqlalchemy import or_, and_, cast, String as SAString, desc as sa_desc, asc as sa_asc
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from typing import List, Optional
@@ -81,7 +82,7 @@ _{{ table_name }}_sortable_columns = {{ '[' }}"{{ columns | map(attribute='name'
 @app.get("/api/{{ table_name }}", response_model=List[schemas.{{ schema_response }}])
 def list_{{ table_name }}(
     limit: int = 100,
-    offset: int = 0,
+    cursor: Optional[str] = Query(None, description="Base64 encoded JSON cursor"),
     search: Optional[str] = Query(None, description="Search across all text columns"),
     order_by: Optional[str] = Query(None, description="Column name to sort by"),
     dir: Optional[str] = Query("asc", description="Sort direction: asc or desc"),
@@ -99,13 +100,52 @@ def list_{{ table_name }}(
         if search_filters:
             query = query.filter(or_(*search_filters))
 
+    # Cursor logic
+    if cursor:
+        try:
+            cursor_data = json.loads(base64.b64decode(cursor).decode("utf-8"))
+            cursor_id = cursor_data.get("id")
+            cursor_val = cursor_data.get("val")
+
+            if order_by and order_by in _{{ table_name }}_sortable_columns and order_by != "id":
+                col_attr = getattr(models.{{ model_name }}, order_by)
+                if dir == "desc":
+                    query = query.filter(
+                        or_(
+                            col_attr < cursor_val,
+                            and_(col_attr == cursor_val, models.{{ model_name }}.id < cursor_id),
+                        )
+                    )
+                else:
+                    query = query.filter(
+                        or_(
+                            col_attr > cursor_val,
+                            and_(col_attr == cursor_val, models.{{ model_name }}.id > cursor_id),
+                        )
+                    )
+            else:
+                if dir == "desc":
+                    query = query.filter(models.{{ model_name }}.id < cursor_id)
+                else:
+                    query = query.filter(models.{{ model_name }}.id > cursor_id)
+        except Exception:
+            pass  # Invalid cursor, ignore
+
     # Column sorting — validated against allowlist to prevent attribute probing
     if order_by and order_by in _{{ table_name }}_sortable_columns:
         col_attr = getattr(models.{{ model_name }}, order_by, None)
         if col_attr is not None:
-            query = query.order_by(sa_desc(col_attr) if dir == "desc" else sa_asc(col_attr))
+            if dir == "desc":
+                query = query.order_by(sa_desc(col_attr), sa_desc(models.{{ model_name }}.id))
+            else:
+                query = query.order_by(sa_asc(col_attr), sa_asc(models.{{ model_name }}.id))
+    else:
+        if dir == "desc":
+            query = query.order_by(sa_desc(models.{{ model_name }}.id))
+        else:
+            query = query.order_by(sa_asc(models.{{ model_name }}.id))
 
-    records = query.offset(offset).limit(limit).all()
+    records = query.limit(limit).all()
     return records
 
 @app.get("/api/{{ table_name }}/export")
