@@ -58,7 +58,7 @@ The `update` command regenerates backend and frontend for new tables/columns add
 
 ---
 
-## Current State (v0.3.1)
+## Current State (v0.3.2)
 
 | Feature | Status |
 |---|---|
