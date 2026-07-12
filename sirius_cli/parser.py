@@ -244,11 +244,17 @@ def parse_excel_files(excel_paths: List[str]) -> Dict[str, List[Dict[str, Any]]]
                     max_val = df[col].max()
                     if pd.notna(min_val):
                         col_dict["min_val"] = (
-                            float(min_val) if col_type == "Float" else int(min_val)
+                            # pyrefly: ignore [bad-assignment]
+                            float(min_val)
+                            if col_type == "Float"
+                            else int(min_val)
                         )
                     if pd.notna(max_val):
                         col_dict["max_val"] = (
-                            float(max_val) if col_type == "Float" else int(max_val)
+                            # pyrefly: ignore [bad-assignment]
+                            float(max_val)
+                            if col_type == "Float"
+                            else int(max_val)
                         )
                 columns.append(col_dict)
 
