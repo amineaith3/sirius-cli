@@ -119,6 +119,31 @@ def parse_config_file(
     return schemas, project_name, theme
 
 
+def _infer_relationships(schemas: Dict[str, List[Dict[str, Any]]]) -> None:
+    """Heuristic-based Relationship inference to link foreign keys."""
+    table_names = list(schemas.keys())
+    for table_name, columns in schemas.items():
+        for col in columns:
+            col_name = str(col["name"])
+            if col_name.endswith("_id") and col_name != "id":
+                prefix = col_name[:-3]  # strip '_id'
+                matched_table = None
+                for t in table_names:
+                    # Try exact match, then common plural/singular variants
+                    candidates = {
+                        prefix,
+                        _pluralize(prefix),
+                        _singularize(prefix),
+                        prefix + "s",
+                        prefix[:-1] if prefix.endswith("s") else prefix,
+                    }
+                    if t in candidates:
+                        matched_table = t
+                        break
+                if matched_table:
+                    col["foreign_key"] = f"{matched_table}.id"
+
+
 def parse_csv_files(csv_paths: List[str]) -> Dict[str, List[Dict[str, Any]]]:
     """Parses list of CSV paths, extracts schema types and infers relationships."""
     schemas = {}
@@ -179,28 +204,7 @@ def parse_csv_files(csv_paths: List[str]) -> Dict[str, List[Dict[str, Any]]]:
 
         schemas[table_name] = columns
 
-    # Heuristic-based Relationship inference (shared by CSV and Excel parsers)
-    table_names = list(schemas.keys())
-    for table_name, columns in schemas.items():
-        for col in columns:
-            col_name = str(col["name"])
-            if col_name.endswith("_id") and col_name != "id":
-                prefix = col_name[:-3]  # strip '_id'
-                matched_table = None
-                for t in table_names:
-                    # Try exact match, then common plural/singular variants
-                    candidates = {
-                        prefix,
-                        _pluralize(prefix),
-                        _singularize(prefix),
-                        prefix + "s",
-                        prefix[:-1] if prefix.endswith("s") else prefix,
-                    }
-                    if t in candidates:
-                        matched_table = t
-                        break
-                if matched_table:
-                    col["foreign_key"] = f"{matched_table}.id"
+    _infer_relationships(schemas)
 
     return schemas
 
@@ -240,11 +244,17 @@ def parse_excel_files(excel_paths: List[str]) -> Dict[str, List[Dict[str, Any]]]
                     max_val = df[col].max()
                     if pd.notna(min_val):
                         col_dict["min_val"] = (
-                            float(min_val) if col_type == "Float" else int(min_val)
+                            # pyrefly: ignore [bad-assignment]
+                            float(min_val)
+                            if col_type == "Float"
+                            else int(min_val)
                         )
                     if pd.notna(max_val):
                         col_dict["max_val"] = (
-                            float(max_val) if col_type == "Float" else int(max_val)
+                            # pyrefly: ignore [bad-assignment]
+                            float(max_val)
+                            if col_type == "Float"
+                            else int(max_val)
                         )
                 columns.append(col_dict)
 
@@ -255,27 +265,7 @@ def parse_excel_files(excel_paths: List[str]) -> Dict[str, List[Dict[str, Any]]]
 
         schemas[table_name] = columns
 
-    # Run same FK heuristic as CSV parser
-    table_names = list(schemas.keys())
-    for table_name, columns in schemas.items():
-        for col in columns:
-            col_name = str(col["name"])
-            if col_name.endswith("_id") and col_name != "id":
-                prefix = col_name[:-3]
-                matched_table = None
-                for t in table_names:
-                    candidates = {
-                        prefix,
-                        _pluralize(prefix),
-                        _singularize(prefix),
-                        prefix + "s",
-                        prefix[:-1] if prefix.endswith("s") else prefix,
-                    }
-                    if t in candidates:
-                        matched_table = t
-                        break
-                if matched_table:
-                    col["foreign_key"] = f"{matched_table}.id"
+    _infer_relationships(schemas)
 
     return schemas
 

@@ -1,4 +1,4 @@
-# Sirius-CLI — Full Audit (v0.3.1)
+# Sirius-CLI — Full Audit (v0.3.2)
 
 ## What It Is
 
@@ -58,7 +58,7 @@ The `update` command regenerates backend and frontend for new tables/columns add
 
 ---
 
-## Current State (v0.3.1)
+## Current State (v0.3.2)
 
 | Feature | Status |
 |---|---|
@@ -66,6 +66,8 @@ The `update` command regenerates backend and frontend for new tables/columns add
 | FK inference (heuristic + PRAGMA) | ✅ Working |
 | `inflect` library for FK plural resolution | ✅ Added in v0.2.5 |
 | Full CRUD routes (GET/POST/PUT/DELETE) | ✅ Working |
+| Cursor Pagination (O(log n) deep loads) | ✅ Added in v0.3.2 |
+| URL-Backed Pagination UI | ✅ Added in v0.3.2 |
 | Server-side search + sorting | ✅ Working + Secured allowlist in v0.2.7 |
 | FK label resolution + badge navigation | ✅ Added in v0.2.5 |
 | JWT Authentication (`--auth`) | ✅ Secured in v0.2.7 (Env vars + auto-gen defaults) |

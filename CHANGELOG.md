@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [0.3.2] — 2026-07-12
+
+### Added
+- Implemented **Cursor Pagination** for O(log N) deep-page loading in the generated FastAPI backend.
+- UI Pagination state is now perfectly backed by URL `searchParams` to survive browser refreshes.
+
+### Changed
+- Extracted and deduplicated heuristic relationship inference across CSV and Excel parsers.
+
+---
+
 ## [0.3.1] — 2026-07-11
 
 ### Fixed
