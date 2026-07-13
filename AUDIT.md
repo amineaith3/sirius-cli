@@ -1,4 +1,4 @@
-# Sirius-CLI — Full Audit (v0.3.2)
+# Sirius-CLI — Full Audit (v0.3.3)
 
 ## What It Is
 
@@ -14,8 +14,9 @@ sirius_cli/
 ├── parser.py     — Schema inference engine (CSV, Excel, SQLite, JSON)
 ├── generator.py  — Jinja2 render pipeline → file output
 └── templates/
-    ├── backend/  — FastAPI, SQLAlchemy, Pydantic v2, Alembic, Dockerfile
-    └── frontend/ — React 18, TypeScript, Vite, Tailwind CSS, CRUD pages
+    ├── backend/     — FastAPI, SQLAlchemy, Pydantic v2, Alembic, Dockerfile
+    └── frontend/    — React 18, TypeScript, Vite, Tailwind CSS, CRUD pages
+        └── src/components/  — SiriusTable, SiriusPagination, SiriusBadge, SiriusDropdown, SiriusError
 ```
 
 The flow is: **Data → Parser → Schema Graph → Jinja2 Generator → Files on disk → Alembic runs migrations → Done.**
@@ -58,7 +59,7 @@ The `update` command regenerates backend and frontend for new tables/columns add
 
 ---
 
-## Current State (v0.3.2)
+## Current State (v0.3.3)
 
 | Feature | Status |
 |---|---|
@@ -82,6 +83,7 @@ The `update` command regenerates backend and frontend for new tables/columns add
 | Form validation (HTML5 required, min, max, email) | ✅ Added in v0.3.0 |
 | In-memory Live Preview (`sirius-preview`) | ✅ Working (v0.2.8) |
 | Comprehensive Automated Test Suite (`pytest`) | ✅ Working (v0.2.8) |
+| React UI Component Library (SiriusTable, SiriusPagination, etc.) | ✅ Added in v0.3.3 |
 
 ---
 
@@ -101,7 +103,7 @@ Prioritized by value-to-effort ratio:
 
 | # | Feature | Why |
 |---|---|---|
-| 4 | **Refined UI Component Library** | Decouple the React frontend into modular standard components to allow developers to build new pages faster. |
+| 4 | **Refined UI Component Library** | ~~Decouple the React frontend into modular standard components to allow developers to build new pages faster.~~ **Done in v0.3.3** |
 
 ### Tier 3 — Strategic Expansion (1-2 weeks each)
 

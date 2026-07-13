@@ -1,0 +1,12 @@
+{% raw %}
+import React from 'react'
+
+export function SiriusError({ title = "Failed to connect to backend server", message = "Make sure your FastAPI server is running." }: { title?: string, message?: string }) {
+  return (
+    <div className="p-6 border border-red-500/20 bg-red-500/5 text-red-400 rounded-2xl text-center">
+      <p className="font-semibold text-sm">{title}</p>
+      <p className="text-xs mt-1 text-red-400/80">{message}</p>
+    </div>
+  )
+}
+{% endraw %}
