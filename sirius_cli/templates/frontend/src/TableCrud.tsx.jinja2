@@ -29,7 +29,10 @@ export default function {{ table_name.replace('_', ' ').title().replace(' ', '')
       type: '{{ col.type }}',
       foreignKey: {% if col.foreign_key %}'{{ col.foreign_key }}'{% else %}null{% endif %},
       isPk: {% if col.is_pk %}true{% else %}false{% endif %},
-      isRequired: {% if col.is_required %}true{% else %}false{% endif %}
+      isRequired: {% if col.is_required %}true{% else %}false{% endif %}{% if col.enum_values is defined and col.enum_values %},
+      enumValues: {{ col.enum_values | tojson }}{% endif %}{% if col.pattern is defined and col.pattern %},
+      pattern: '{{ col.pattern }}'{% endif %}{% if col.placeholder is defined and col.placeholder %},
+      placeholder: '{{ col.placeholder }}'{% endif %}
     },
     {% endfor %}
   ]
@@ -528,6 +531,20 @@ export default function {{ table_name.replace('_', ' ').title().replace(' ', '')
                   className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs focus:border-brand-500 focus:outline-none text-slate-200 transition-colors"
                 />
 
+                 {% elif col.enum_values is defined and col.enum_values %}
+                <select
+                  name="{{ col.name }}"
+                  value={formData.{{ col.name }} || ''}
+                  onChange={handleInputChange}
+                  {% if col.is_required %}required{% endif %}
+                  className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs focus:border-brand-500 focus:outline-none text-slate-200 transition-colors"
+                >
+                  <option value="">Select {{ col.name.replace('_', ' ') }}...</option>
+                  {% for val in col.enum_values %}
+                  <option value="{{ val }}">{{ val }}</option>
+                  {% endfor %}
+                </select>
+
                 {% else %}
                 <input
                   type="{% if 'email' in col.name %}email{% else %}text{% endif %}"
@@ -535,6 +552,9 @@ export default function {{ table_name.replace('_', ' ').title().replace(' ', '')
                   value={formData.{{ col.name }} || ''}
                   onChange={handleInputChange}
                   {% if col.is_required %}required{% endif %}
+                  {% if col.pattern is defined and col.pattern %}pattern="{{ col.pattern }}"{% endif %}
+                  {% if col.placeholder is defined and col.placeholder %}placeholder="{{ col.placeholder }}"{% endif %}
+                  {% if col.placeholder is defined and col.placeholder %}title="Expected format: {{ col.placeholder }}"{% endif %}
                   className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs focus:border-brand-500 focus:outline-none text-slate-200 transition-colors"
                 />
                 {% endif %}

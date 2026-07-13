@@ -1,4 +1,4 @@
-# Sirius-CLI — Full Audit (v0.3.4)
+# Sirius-CLI — Full Audit (v0.3.5)
 
 ## What It Is
 
@@ -59,7 +59,7 @@ The `update` command regenerates backend and frontend for new tables/columns add
 
 ---
 
-## Current State (v0.3.4)
+## Current State (v0.3.5)
 
 | Feature | Status |
 |---|---|
@@ -81,7 +81,7 @@ The `update` command regenerates backend and frontend for new tables/columns add
 | PyPI distribution via GitHub Actions | ✅ Working |
 | Documentation Website | ✅ Built & Live on GH Pages (v0.2.7) |
 | Community Standards (SECURITY/CONTRIBUTING/CHANGELOG) | ✅ Added in v0.2.7 |
-| Form validation (HTML5 required, min, max, email) | ✅ Added in v0.3.0 |
+| Form validation (required, min, max, email, phone, zip, native enums) | ✅ Enhanced in v0.3.5 |
 | In-memory Live Preview (`sirius-preview`) | ✅ Working (v0.2.8) |
 | Comprehensive Automated Test Suite (`pytest`) | ✅ Working (v0.2.8) |
 | React UI Component Library (SiriusTable, SiriusPagination, etc.) | ✅ Added in v0.3.3 |
@@ -92,7 +92,7 @@ The `update` command regenerates backend and frontend for new tables/columns add
 
 | Issue | Severity | Impact |
 |---|---|---|
-| No complex regex validation | Low | Email relies on basic HTML5 `type="email"` without strict regex |
+| None | - | All target validation and schema requirements fully resolved |
 
 ---
 

@@ -21,6 +21,99 @@ def _singularize(word: str) -> str:
     return result if result else word
 
 
+def _is_phone_column(name: str, sample_values: List[Any]) -> bool:
+    """Detects if a column is likely a phone number based on name or value patterns."""
+    n = name.lower()
+    if any(x in n for x in ["phone", "mobile", "tel", "telephone"]):
+        return True
+    phone_pat = re.compile(r"^\+?[\d\s\-\(\)\.]{7,20}$")
+    vals = [v for v in sample_values if v is not None and str(v).strip() != ""]
+    if not vals:
+        return False
+    # Require at least one digit or a + sign to avoid matching plain words
+    has_digit_or_plus = any(
+        any(char.isdigit() or char == "+" for char in str(v)) for v in vals
+    )
+    if not has_digit_or_plus:
+        return False
+    return all(
+        isinstance(v, (str, int)) and phone_pat.match(str(v).strip()) for v in vals
+    )
+
+
+def _is_zip_column(name: str, sample_values: List[Any]) -> bool:
+    """Detects if a column is likely a zip/postal code based on name or value patterns."""
+    n = name.lower()
+    if any(x in n for x in ["zip", "postal", "postcode"]):
+        return True
+    zip_pat = re.compile(r"^(\d{5}(-\d{4})?|[a-zA-Z0-9\s\-]{3,10})$")
+    vals = [v for v in sample_values if v is not None and str(v).strip() != ""]
+    if not vals:
+        return False
+    # Ensure there is at least one digit in the values to avoid matching plain words
+    has_digit = any(any(char.isdigit() for char in str(v)) for v in vals)
+    if not has_digit:
+        return False
+    return all(
+        isinstance(v, (str, int)) and zip_pat.match(str(v).strip()) for v in vals
+    )
+
+
+def _detect_enum_values(
+    name: str, col_type: str, sample_values: List[Any]
+) -> List[str]:
+    """Detects if a column represents a low-cardinality enum and returns its values."""
+    if col_type != "String":
+        return []
+    n = name.lower()
+    if (
+        n in ["id", "email", "name", "notes", "comment", "description", "desc"]
+        or n.endswith("_id")
+        or any(
+            x in n
+            for x in [
+                "phone",
+                "mobile",
+                "tel",
+                "telephone",
+                "zip",
+                "postal",
+                "postcode",
+            ]
+        )
+    ):
+        return []
+    vals = [
+        str(v).strip() for v in sample_values if v is not None and str(v).strip() != ""
+    ]
+    if len(vals) < 3:
+        return []
+    unique_vals = set(vals)
+    if len(unique_vals) < 2 or len(unique_vals) > 10:
+        return []
+    # If all values are unique and we have few rows, it's likely just text
+    if len(unique_vals) == len(vals) and len(vals) < 8:
+        enum_names = [
+            "status",
+            "role",
+            "type",
+            "category",
+            "stage",
+            "gender",
+            "priority",
+            "rating",
+            "size",
+            "color",
+            "level",
+        ]
+        if not any(x in n for x in enum_names):
+            return []
+    # Enforce a maximum length for enum values (most enums are short words)
+    if any(len(v) > 20 for v in unique_vals):
+        return []
+    return sorted(list(unique_vals))
+
+
 def sanitize_table_name(name: str) -> str:
     """Sanitizes file path/table name to a valid SQL identifier."""
     base = os.path.splitext(os.path.basename(name))[0]
@@ -95,6 +188,12 @@ def parse_config_file(
                 col_dict["min_val"] = col["min_val"]
             if "max_val" in col:
                 col_dict["max_val"] = col["max_val"]
+            if "pattern" in col:
+                col_dict["pattern"] = col["pattern"]
+            if "placeholder" in col:
+                col_dict["placeholder"] = col["placeholder"]
+            if "enum_values" in col:
+                col_dict["enum_values"] = col["enum_values"]
 
             if fk:
                 col_dict["foreign_key"] = fk
@@ -196,6 +295,17 @@ def parse_csv_files(csv_paths: List[str]) -> Dict[str, List[Dict[str, Any]]]:
                             float(max_val) if col_type == "Float" else int(max_val)
                         )
                 columns.append(col_dict)
+                samples = df[col].dropna().tolist()
+                if _is_phone_column(san_col, samples):
+                    col_dict["pattern"] = r"\+?[0-9\s\-()]{7,20}"
+                    col_dict["placeholder"] = "e.g., +1 (555) 000-0000"
+                elif _is_zip_column(san_col, samples):
+                    col_dict["pattern"] = r"[a-zA-Z0-9\s\-]{3,10}"
+                    col_dict["placeholder"] = "e.g., 90210"
+                else:
+                    enum_vals = _detect_enum_values(san_col, col_type, samples)
+                    if enum_vals:
+                        col_dict["enum_values"] = enum_vals
 
         if not has_id:
             columns.insert(
@@ -257,6 +367,17 @@ def parse_excel_files(excel_paths: List[str]) -> Dict[str, List[Dict[str, Any]]]
                             else int(max_val)
                         )
                 columns.append(col_dict)
+                samples = df[col].dropna().tolist()
+                if _is_phone_column(san_col, samples):
+                    col_dict["pattern"] = r"\+?[0-9\s\-()]{7,20}"
+                    col_dict["placeholder"] = "e.g., +1 (555) 000-0000"
+                elif _is_zip_column(san_col, samples):
+                    col_dict["pattern"] = r"[a-zA-Z0-9\s\-]{3,10}"
+                    col_dict["placeholder"] = "e.g., 90210"
+                else:
+                    enum_vals = _detect_enum_values(san_col, col_type, samples)
+                    if enum_vals:
+                        col_dict["enum_values"] = enum_vals
 
         if not has_id:
             columns.insert(
@@ -339,6 +460,29 @@ def parse_sqlite_db(db_path: str) -> Dict[str, List[Dict[str, Any]]]:
             if col_name == "id":
                 has_id = True
                 col_dict["is_pk"] = True
+
+            if not is_pk:
+                samples = []
+                try:
+                    cursor2 = conn.cursor()
+                    cursor2.execute(
+                        f'SELECT "{info[1]}" FROM "{table}" WHERE "{info[1]}" IS NOT NULL LIMIT 50;'
+                    )
+                    samples = [r[0] for r in cursor2.fetchall()]
+                    cursor2.close()
+                except Exception:
+                    pass
+
+                if _is_phone_column(col_name, samples):
+                    col_dict["pattern"] = r"\+?[0-9\s\-()]{7,20}"
+                    col_dict["placeholder"] = "e.g., +1 (555) 000-0000"
+                elif _is_zip_column(col_name, samples):
+                    col_dict["pattern"] = r"[a-zA-Z0-9\s\-]{3,10}"
+                    col_dict["placeholder"] = "e.g., 90210"
+                else:
+                    enum_vals = _detect_enum_values(col_name, col_type, samples)
+                    if enum_vals:
+                        col_dict["enum_values"] = enum_vals
 
             columns.append(col_dict)
 
