@@ -19,7 +19,7 @@
     <!-- Fixed Sidebar -->
     <aside class="sidebar">
         <div class="sidebar-header">
-            <div class="logo">Sirius-CLI <span class="version">v0.3.3</span></div>
+            <div class="logo">Sirius-CLI <span class="version">v0.3.4</span></div>
             <button id="theme-toggle" class="theme-btn" aria-label="Toggle Theme">
                 <!-- SVG injected via JS -->
             </button>
@@ -218,6 +218,10 @@
                             <td><code>--no-seed</code></td>
                             <td>Skips inserting rows from source files into the generated SQLite DB.</td>
                         </tr>
+                        <tr>
+                            <td><code>--from-url</code></td>
+                            <td>URL of a public CSV/JSON/Excel file to fetch and scaffold from (repeatable). Downloads are cached locally.</td>
+                        </tr>
                     </tbody>
                 </table>
             </div>
@@ -228,7 +232,7 @@
                 <pre><code>sirius-init update &lt;project_path&gt; [OPTIONS]</code></pre>
                 <button class="copy-btn">Copy</button>
             </div>
-            <p><em>Accepts the same input flags (`--csv`, `--db`, etc.) as the init command, plus `-m` for custom migration messages.</em></p>
+            <p><em>Accepts the same input flags (`--csv`, `--db`, `--from-url`, etc.) as the init command, plus `-m` for custom migration messages.</em></p>
 
             <h3 id="preview-command">4.3 sirius-init preview</h3>
             <p>Provides an instant, ephemeral way to visualize your inferred data schemas and UI without writing a single file to disk. The engine creates an in-memory SQLite database, constructs a dynamic FastAPI router on the fly, and serves a beautiful Vue 3 + Tailwind CSS frontend interface directly from the CLI.</p>
@@ -236,7 +240,7 @@
                 <pre><code>sirius-init preview [OPTIONS]</code></pre>
                 <button class="copy-btn">Copy</button>
             </div>
-            <p><em>Accepts `--csv`, `--excel`, and `--db` flags for data input, plus `--port` to specify the local server port.</em></p>
+            <p><em>Accepts `--csv`, `--excel`, `--db`, and `--from-url` flags for data input, plus `--port` to specify the local server port.</em></p>
         </section>
 
         <section id="architecture">
