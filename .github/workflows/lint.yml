@@ -20,7 +20,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install black flake8 mypy
     - name: Run Black (Formatting)
-      run: black --check .
+      run: black --check --target-version py310 .
     - name: Run Flake8 (Linting)
       run: flake8 .
     - name: Run MyPy (Type Checking)
