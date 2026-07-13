@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [0.3.3] — 2026-07-13
+
+### Changed
+- Decoupled `TableCrud.tsx` into a modular, enterprise-grade React component library:
+  - `SiriusTable`: A fully dynamic data grid driven by a runtime JSON schema — zero Jinja loops in the table body.
+  - `SiriusPagination`: Standalone cursor pagination footer component.
+  - `SiriusBadge`: Reusable boolean TRUE/FALSE status indicator.
+  - `SiriusDropdown`: Decoupled FK `<select>` resolver used in modals.
+  - `SiriusError`: Unified server connectivity error component.
+- Generator engine updated to scaffold `frontend/src/components/` directory.
+- `TableCrud.tsx.jinja2` now emits a `tableSchema: ColumnSchema[]` JSON array via Jinja and delegates all rendering to `<SiriusTable>`.
+
+---
+
 ## [0.3.2] — 2026-07-12
 
 ### Added

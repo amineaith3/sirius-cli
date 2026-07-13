@@ -1,0 +1,36 @@
+{% raw %}
+import React from 'react'
+
+interface SiriusDropdownProps {
+  name: string;
+  value: string | number;
+  onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  options: any[];
+  error?: string | null;
+  targetTable: string;
+  required?: boolean;
+}
+
+export function SiriusDropdown({ name, value, onChange, options, error, targetTable, required }: SiriusDropdownProps) {
+  return (
+    <select
+      name={name}
+      value={value !== undefined && value !== null ? value : ''}
+      onChange={onChange}
+      required={required}
+      className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs focus:border-brand-500 focus:outline-none text-slate-200 transition-colors w-full"
+    >
+      <option value="">Select {targetTable.replace('_', ' ')}</option>
+      {error ? (
+        <option disabled>Failed to load options</option>
+      ) : (
+        options.map((opt: any) => (
+          <option key={opt.id} value={opt.id}>
+            {opt.name || opt.username || opt.email || opt.title || opt.label || `ID: ${opt.id}`}
+          </option>
+        ))
+      )}
+    </select>
+  )
+}
+{% endraw %}

@@ -96,6 +96,11 @@ def generate_project(
         "frontend/src/index.css.jinja2": "src/index.css",
         "frontend/src/App.tsx.jinja2": "src/App.tsx",
         "frontend/src/Dashboard.tsx.jinja2": "src/Dashboard.tsx",
+        "frontend/src/components/SiriusTable.tsx.jinja2": "src/components/SiriusTable.tsx",
+        "frontend/src/components/SiriusPagination.tsx.jinja2": "src/components/SiriusPagination.tsx",
+        "frontend/src/components/SiriusBadge.tsx.jinja2": "src/components/SiriusBadge.tsx",
+        "frontend/src/components/SiriusDropdown.tsx.jinja2": "src/components/SiriusDropdown.tsx",
+        "frontend/src/components/SiriusError.tsx.jinja2": "src/components/SiriusError.tsx",
     }
 
     if auth:
