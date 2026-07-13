@@ -10,6 +10,9 @@ export interface ColumnSchema {
   foreignKey: string | null;
   isPk: boolean;
   isRequired: boolean;
+  enumValues?: string[];
+  pattern?: string;
+  placeholder?: string;
 }
 
 interface SiriusTableProps {

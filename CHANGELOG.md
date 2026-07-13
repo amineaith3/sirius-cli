@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [0.3.5] — 2026-07-13
+
+### Added
+- Heuristic-based validation parsing for phone numbers, zip codes, and low-cardinality enum columns in CSV, Excel, and SQLite.
+- Fully dynamic frontend React form generation with support for HTML5 `pattern` regex validation, dynamic input `placeholder`/`title` tooltips, and native `<select>` dropdown inputs for enum columns.
+- Query-based sample data inspection for SQLite tables to perform name and value-based heuristics.
+- Added test coverage verifying validation pattern and enum detection in both SQL and CSV parser engines.
+
+---
+
 ## [0.3.4] — 2026-07-13
 
 ### Added
