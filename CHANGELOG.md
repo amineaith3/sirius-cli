@@ -6,9 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
-## [0.3.3] — 2026-07-13
+## [0.3.4] — 2026-07-13
 
-### Changed
+### Added
+- `--from-url` flag added to `init`, `update`, and `preview` commands to scaffold projects directly from public CSV/JSON/Excel URLs.
+- Implemented robust remote file downloader with streaming progress indicators.
+- Added intelligent local caching using URL SHA-256 hashes (`~/.sirius_cache/`) to prevent redundant downloads and rate limiting.
+- Graceful Content-Type header fallback detection for URLs missing explicit file extensions.
+
+---
+
+## [0.3.3] — 2026-07-13
 - Decoupled `TableCrud.tsx` into a modular, enterprise-grade React component library:
   - `SiriusTable`: A fully dynamic data grid driven by a runtime JSON schema — zero Jinja loops in the table body.
   - `SiriusPagination`: Standalone cursor pagination footer component.

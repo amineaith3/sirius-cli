@@ -178,3 +178,118 @@ def test_flag_conflicting_inputs(tmp_project_dir, sample_config_json, sample_csv
     # Expect error because of multiple input sources
     assert result.exit_code == 1
     assert "Error: You must provide exactly one input option" in result.output
+
+
+# ─── --from-url tests (all network calls are mocked) ──────────────────────────
+
+
+def test_flag_from_url_csv(tmp_project_dir, sample_csv_file):
+    """--from-url with a remote CSV should scaffold a project identically to --csv."""
+    from unittest.mock import MagicMock, patch
+
+    project_path = os.path.join(tmp_project_dir, "app_from_url")
+    cache_dir = __import__("pathlib").Path(tmp_project_dir) / ".cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+
+    # Build a fake response that streams the CSV content
+    fake_csv_bytes = open(sample_csv_file, "rb").read()
+
+    mock_head = MagicMock()
+    mock_head.status_code = 200
+    mock_head.headers = {"Content-Type": "text/csv"}
+    mock_head.raise_for_status = lambda: None
+
+    # The inner object returned by __enter__ must have the correct attributes
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.headers = {"Content-Length": str(len(fake_csv_bytes))}
+    mock_response.raise_for_status = lambda: None
+    mock_response.iter_content = lambda chunk_size: [fake_csv_bytes]
+
+    # requests.get is used as a context manager: `with requests.get(...) as resp`
+    mock_get_cm = MagicMock()
+    mock_get_cm.__enter__ = MagicMock(return_value=mock_response)
+    mock_get_cm.__exit__ = MagicMock(return_value=False)
+
+    with (
+        patch("sirius_cli.fetcher.requests.head", return_value=mock_head),
+        patch("sirius_cli.fetcher.requests.get", return_value=mock_get_cm),
+        patch("sirius_cli.fetcher.get_cache_dir", return_value=cache_dir),
+    ):
+        result = runner.invoke(
+            app,
+            [
+                "init",
+                project_path,
+                "--from-url",
+                "http://example.com/data.csv",
+                "--no-seed",
+            ],
+        )
+
+    assert result.exit_code == 0, result.output
+    assert os.path.exists(os.path.join(project_path, "backend", "main.py"))
+
+
+def test_flag_from_url_invalid_type(tmp_project_dir):
+    """--from-url pointing to an unsupported file type should exit with code 1."""
+    from unittest.mock import MagicMock, patch
+
+    project_path = os.path.join(tmp_project_dir, "app_bad_url")
+
+    mock_head = MagicMock()
+    mock_head.status_code = 200
+    mock_head.headers = {"Content-Type": "application/pdf"}
+    mock_head.raise_for_status = lambda: None
+
+    with (
+        patch("sirius_cli.fetcher.requests.head", return_value=mock_head),
+        patch(
+            "sirius_cli.fetcher.get_cache_dir",
+            return_value=__import__("pathlib").Path(tmp_project_dir) / ".cache",
+        ),
+    ):
+        result = runner.invoke(
+            app,
+            [
+                "init",
+                project_path,
+                "--from-url",
+                "http://example.com/report.pdf",
+            ],
+        )
+
+    assert result.exit_code == 1
+    assert "Error fetching remote file" in result.output
+
+
+def test_flag_from_url_network_error(tmp_project_dir):
+    """--from-url on a network failure should exit with code 1 and report the error."""
+    from unittest.mock import patch
+
+    import requests as req_lib
+
+    project_path = os.path.join(tmp_project_dir, "app_net_error")
+
+    with (
+        patch(
+            "sirius_cli.fetcher.requests.head",
+            side_effect=req_lib.ConnectionError("Simulated network failure"),
+        ),
+        patch(
+            "sirius_cli.fetcher.get_cache_dir",
+            return_value=__import__("pathlib").Path(tmp_project_dir) / ".cache",
+        ),
+    ):
+        result = runner.invoke(
+            app,
+            [
+                "init",
+                project_path,
+                "--from-url",
+                "http://unreachable.example.com/data.csv",
+            ],
+        )
+
+    assert result.exit_code == 1
+    assert "Error fetching remote file" in result.output

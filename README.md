@@ -56,14 +56,20 @@ sirius-init init store_system --csv examples/users.csv --csv examples/orders.csv
 sirius-init init store_system --excel examples/products.xlsx --theme amber
 ```
 
-### 2. Target Production Databases
+### 2. Generating from Remote URLs
+Provide a public URL to a CSV, Excel, or JSON file. Sirius-CLI will download it, cache it locally (to prevent rate-limits on re-runs), and scaffold the app on the fly.
+```bash
+sirius-init init remote_app --from-url https://raw.githubusercontent.com/datasets/gdp/master/data/gdp.csv
+```
+
+### 3. Target Production Databases
 By default, the stack uses an embedded SQLite file (`app.db`). You can target Postgres or MySQL instead:
 ```bash
 sirius-init init billing_system --config schema.json --pg
 ```
 *(The generated `docker-compose.yml` and `database.py` will expect a `DATABASE_URL` environment variable).*
 
-### 3. Generating from JSON Configuration
+### 4. Generating from JSON Configuration
 Specify database schemas, relationships, and colors in a JSON file:
 ```json
 {
@@ -95,7 +101,7 @@ Then run:
 sirius-init init billing_system --config examples/billing-config.json
 ```
 
-### 4. Generating with JWT Authentication
+### 5. Generating with JWT Authentication
 Pass the `--auth` flag to scaffold a secure project. This generates an `app_users` table, a beautiful Login screen, and protects all FastAPI routes with JWT Bearer tokens automatically.
 ```bash
 sirius-init init secure_system --csv examples/users.csv --auth --admin-user "superadmin" --admin-pass "securepass123"
@@ -137,6 +143,7 @@ Sirius-CLI will:
 |---|---|---|---|
 | `--csv` | | | Path to a CSV file (repeatable) |
 | `--excel` | | | Path to an Excel .xlsx/.xls file (repeatable) |
+| `--from-url` | | | URL of a public CSV/JSON/Excel file to fetch (repeatable) |
 | `--db` | | | Path to a SQLite .db file |
 | `--config` | `-c` | | Path to a JSON config file |
 | `--theme` | `-t` | `blue` | Frontend color theme (`blue`, `indigo`, `emerald`, `amber`, `rose`, `sky`, `violet`) |

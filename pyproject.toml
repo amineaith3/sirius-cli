@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sirius-cli"
-version = "0.3.3"
+version = "0.3.4"
 description = "A rapid prototyping tool for generating containerized backend + frontend CRUD stacks from CSV/SQLite files."
 readme = "README.md"
 requires-python = ">=3.9"
@@ -49,7 +49,8 @@ dependencies = [
     "openpyxl>=3.0.0",
     "inflect>=7.0.0",
     "fastapi>=0.100.0",
-    "uvicorn>=0.20.0"
+    "uvicorn>=0.20.0",
+    "requests>=2.28.0",
 ]
 
 [project.optional-dependencies]

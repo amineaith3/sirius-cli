@@ -1,4 +1,4 @@
-# Sirius-CLI — Full Audit (v0.3.3)
+# Sirius-CLI — Full Audit (v0.3.4)
 
 ## What It Is
 
@@ -59,10 +59,11 @@ The `update` command regenerates backend and frontend for new tables/columns add
 
 ---
 
-## Current State (v0.3.3)
+## Current State (v0.3.4)
 
 | Feature | Status |
 |---|---|
+| `--from-url` remote fetching | ✅ Added in v0.3.4 |
 | CSV, Excel, SQLite, JSON input | ✅ Working |
 | FK inference (heuristic + PRAGMA) | ✅ Working |
 | `inflect` library for FK plural resolution | ✅ Added in v0.2.5 |
@@ -111,7 +112,7 @@ Prioritized by value-to-effort ratio:
 |---|---|---|
 | 5 | **`--backend=flask\|django\|fastapi` selector** | Unlocks the Django and Flask developer markets. |
 | 6 | **`--frontend=react\|vue\|svelte` selector** | Combined with backend selectors = 9 unique stack combinations from a single command. |
-| 7 | **`--from-url` flag** | Accept a public CSV URL and fetch + parse on the fly. |
+| 7 | **`--from-url` flag** | ~~Accept a public CSV URL and fetch + parse on the fly.~~ **Done in v0.3.4** |
 
 ---
 

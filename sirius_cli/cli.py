@@ -18,6 +18,7 @@ from sirius_cli.parser import (
 )
 from sirius_cli.generator import generate_project, render_alembic_files
 from sirius_cli.preview import run_preview
+from sirius_cli.fetcher import fetch_remote_file
 
 app = typer.Typer(
     help="Sirius-CLI: A rapid prototyping backend and frontend code generator."
@@ -227,17 +228,47 @@ def init(
         "--admin-pass",
         help="Admin password if --auth is used (auto-generated if not provided)",
     ),
+    from_url: Optional[List[str]] = typer.Option(
+        None,
+        "--from-url",
+        help="URL(s) of a public CSV/JSON/Excel file to fetch and scaffold from (repeatable)",
+    ),
 ):
     """Initializes a new FastAPI backend and React frontend stack from data files or configuration."""
     # Ensure one and only one source parameter is provided
-    inputs = [bool(csv), bool(excel), bool(db), bool(config)]
+    inputs = [bool(csv), bool(excel), bool(db), bool(config), bool(from_url)]
     if sum(inputs) != 1:
         typer.secho(
-            "Error: You must provide exactly one input option: --csv, --excel, --db, or --config.",
+            "Error: You must provide exactly one input option: --csv, --excel, --db, --config, or --from-url.",
             fg=typer.colors.RED,
             err=True,
         )
         raise typer.Exit(code=1)
+
+    # Resolve remote URLs into local cached files
+    if from_url:
+        typer.echo("Fetching remote file(s)...")
+        try:
+            fetched_paths = [str(fetch_remote_file(u)) for u in from_url]
+        except Exception as e:
+            typer.secho(
+                f"Error fetching remote file: {e}", fg=typer.colors.RED, err=True
+            )
+            raise typer.Exit(code=1)
+        # Classify by extension and route to the correct parser
+        from pathlib import Path as _Path
+
+        csv_like = [p for p in fetched_paths if _Path(p).suffix.lower() == ".csv"]
+        excel_like = [
+            p for p in fetched_paths if _Path(p).suffix.lower() in (".xlsx", ".xls")
+        ]
+        json_like = [p for p in fetched_paths if _Path(p).suffix.lower() == ".json"]
+        if csv_like:
+            csv = csv_like
+        elif excel_like:
+            excel = excel_like
+        elif json_like:
+            config = json_like[0]
 
     # If --auth is used and no password provided, generate a secure random one
     if auth and not admin_pass:
@@ -487,6 +518,11 @@ def update(
         "--admin-pass",
         help="Admin password if --auth is used (auto-generated if not provided)",
     ),
+    from_url: Optional[List[str]] = typer.Option(
+        None,
+        "--from-url",
+        help="URL(s) of a public CSV/JSON/Excel file to fetch and scaffold from (repeatable)",
+    ),
 ):
     """Updates an existing project with new columns/tables."""
     if not os.path.exists(project_path):
@@ -497,14 +533,38 @@ def update(
         )
         raise typer.Exit(code=1)
 
-    inputs = [bool(csv), bool(excel), bool(db), bool(config)]
+    inputs = [bool(csv), bool(excel), bool(db), bool(config), bool(from_url)]
     if sum(inputs) != 1:
         typer.secho(
-            "Error: You must provide exactly one input option: --csv, --excel, --db, or --config.",
+            "Error: You must provide exactly one input option: --csv, --excel, --db, --config, or --from-url.",
             fg=typer.colors.RED,
             err=True,
         )
         raise typer.Exit(code=1)
+
+    # Resolve remote URLs into local cached files
+    if from_url:
+        typer.echo("Fetching remote file(s)...")
+        try:
+            fetched_paths = [str(fetch_remote_file(u)) for u in from_url]
+        except Exception as e:
+            typer.secho(
+                f"Error fetching remote file: {e}", fg=typer.colors.RED, err=True
+            )
+            raise typer.Exit(code=1)
+        from pathlib import Path as _Path
+
+        csv_like = [p for p in fetched_paths if _Path(p).suffix.lower() == ".csv"]
+        excel_like = [
+            p for p in fetched_paths if _Path(p).suffix.lower() in (".xlsx", ".xls")
+        ]
+        json_like = [p for p in fetched_paths if _Path(p).suffix.lower() == ".json"]
+        if csv_like:
+            csv = csv_like
+        elif excel_like:
+            excel = excel_like
+        elif json_like:
+            config = json_like[0]
 
     # If --auth is used and no password provided, generate a secure random one
     if auth and not admin_pass:
@@ -608,16 +668,45 @@ def preview(
         None, "--config", "-c", help="Path to JSON config"
     ),
     port: int = typer.Option(8765, "--port", "-p", help="Port for the preview server"),
+    from_url: Optional[List[str]] = typer.Option(
+        None,
+        "--from-url",
+        help="URL(s) of a public CSV/JSON/Excel file to fetch and preview from (repeatable)",
+    ),
 ):
     """Instantly preview a generated UI based on schema sources without creating files."""
-    inputs = [bool(csv), bool(excel), bool(db), bool(config)]
+    inputs = [bool(csv), bool(excel), bool(db), bool(config), bool(from_url)]
     if sum(inputs) != 1:
         typer.secho(
-            "Error: You must provide exactly one input option: --csv, --excel, --db, or --config.",
+            "Error: You must provide exactly one input option: --csv, --excel, --db, --config, or --from-url.",
             fg=typer.colors.RED,
             err=True,
         )
         raise typer.Exit(code=1)
+
+    # Resolve remote URLs into local cached files
+    if from_url:
+        typer.echo("Fetching remote file(s)...")
+        try:
+            fetched_paths = [str(fetch_remote_file(u)) for u in from_url]
+        except Exception as e:
+            typer.secho(
+                f"Error fetching remote file: {e}", fg=typer.colors.RED, err=True
+            )
+            raise typer.Exit(code=1)
+        from pathlib import Path as _Path
+
+        csv_like = [p for p in fetched_paths if _Path(p).suffix.lower() == ".csv"]
+        excel_like = [
+            p for p in fetched_paths if _Path(p).suffix.lower() in (".xlsx", ".xls")
+        ]
+        json_like = [p for p in fetched_paths if _Path(p).suffix.lower() == ".json"]
+        if csv_like:
+            csv = csv_like
+        elif excel_like:
+            excel = excel_like
+        elif json_like:
+            config = json_like[0]
 
     typer.echo("Parsing schemas for preview...")
     try:
