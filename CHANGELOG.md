@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [0.3.6] — 2026-07-14
+
+### Added
+- Implemented elegant empty state handling directly within `<SiriusTable>` for 0-record scenarios, featuring an intuitive CTA to add records.
+- Added a reusable `<SiriusToast>` component for non-blocking success and error notifications across all CRUD operations.
+- Added skeleton loading overlays to `<SiriusTable>` to prevent jarring layout shifts during data fetching and pagination.
+- Added graceful 404 handling when navigating to deleted foreign key parent records via URL `highlight` parameters.
+
+---
+
 ## [0.3.5] — 2026-07-13
 
 ### Added
