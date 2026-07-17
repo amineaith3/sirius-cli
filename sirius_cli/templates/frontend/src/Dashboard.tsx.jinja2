@@ -15,6 +15,26 @@ export default function Dashboard() {
   const [metadata, setMetadata] = useState<TableMetadata[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [tableData, setTableData] = useState<Record<string, any[]>>({})
+  const [chartsLoading, setChartsLoading] = useState<Record<string, boolean>>({})
+  const [chartsError, setChartsError] = useState<Record<string, string | null>>({})
+
+  const fetchAllTableData = async (tables: TableMetadata[]) => {
+    tables.forEach(async (table) => {
+      try {
+        setChartsLoading(prev => ({ ...prev, [table.name]: true }))
+        const res = await fetch(`${API_BASE}/api/${table.name}?limit=500`{% if auth %}, { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }{% endif %})
+        if (!res.ok) throw new Error(`Failed to fetch ${table.name} data`)
+        const data = await res.json()
+        setTableData(prev => ({ ...prev, [table.name]: data }))
+        setChartsError(prev => ({ ...prev, [table.name]: null }))
+      } catch (err: any) {
+        setChartsError(prev => ({ ...prev, [table.name]: err.message || 'Failed to load' }))
+      } finally {
+        setChartsLoading(prev => ({ ...prev, [table.name]: false }))
+      }
+    })
+  }
 
   const fetchMetadata = async () => {
     try {
@@ -24,6 +44,7 @@ export default function Dashboard() {
       const data = await res.json()
       setMetadata(data)
       setError(null)
+      fetchAllTableData(data)
     } catch (err: any) {
       setError(err.message || 'Something went wrong')
     } finally {
@@ -34,6 +55,73 @@ export default function Dashboard() {
   useEffect(() => {
     fetchMetadata()
   }, [])
+
+  const findDateColumn = (table: TableMetadata) => {
+    const dateTimeCol = table.columns.find(col => col.type === 'DateTime')
+    if (dateTimeCol) return dateTimeCol.name
+
+    const nameMatch = table.columns.find(col => {
+      const n = col.name.toLowerCase()
+      return n === 'created_at' || n === 'updated_at' || n.endsWith('_at') || n.endsWith('_date') || n === 'date'
+    })
+    return nameMatch ? nameMatch.name : null
+  }
+
+  const getChartData = (table: TableMetadata) => {
+    const data = tableData[table.name] || []
+    const dateFieldName = findDateColumn(table)
+
+    if (!dateFieldName || data.length === 0) {
+      return {
+        data: [{ name: 'Total Records', count: table.count }],
+        isFallback: true,
+        dateField: null
+      }
+    }
+
+    const counts: Record<string, number> = {}
+    data.forEach(row => {
+      const rawVal = row[dateFieldName]
+      if (!rawVal) return
+      
+      let dateStr = ''
+      try {
+        const dateObj = new Date(rawVal)
+        if (!isNaN(dateObj.getTime())) {
+          dateStr = dateObj.toISOString().split('T')[0]
+        } else {
+          dateStr = String(rawVal).split('T')[0].split(' ')[0]
+        }
+      } catch {
+        dateStr = String(rawVal).split('T')[0].split(' ')[0]
+      }
+      
+      if (dateStr) {
+        counts[dateStr] = (counts[dateStr] || 0) + 1
+      }
+    })
+
+    const chartData = Object.entries(counts).map(([date, count]) => ({
+      name: date,
+      count
+    }))
+
+    chartData.sort((a, b) => new Date(a.name).getTime() - new Date(b.name).getTime())
+
+    if (chartData.length === 0) {
+      return {
+        data: [{ name: 'Total Records', count: table.count }],
+        isFallback: true,
+        dateField: null
+      }
+    }
+
+    return {
+      data: chartData.slice(-15),
+      isFallback: false,
+      dateField: dateFieldName
+    }
+  }
 
   const totalTables = metadata.length
   const totalRows = metadata.reduce((acc, curr) => acc + curr.count, 0)
@@ -91,49 +179,96 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Row Distribution Chart */}
+      {/* Entity Charts Grid */}
       {!loading && !error && metadata.length > 0 && (
-        <div className="p-6 bg-slate-900/30 border border-slate-900 rounded-2xl">
-          <h3 className="text-lg font-bold font-outfit text-slate-200 mb-6 flex items-center gap-2">
+        <div className="space-y-6">
+          <h3 className="text-lg font-bold font-outfit text-slate-200 flex items-center gap-2">
             <BarChart2 className="w-5 h-5 text-brand-400" />
-            Record Distribution
+            Entity Trends & Activity
           </h3>
-          <div className="h-72 w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={metadata} margin={ { top: 10, right: 10, left: -20, bottom: 0 } }>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                <XAxis 
-                  dataKey="name" 
-                  stroke="#64748b" 
-                  fontSize={12} 
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(val) => val.replace('_', ' ')}
-                />
-                <YAxis 
-                  stroke="#64748b" 
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(val) => val >= 1000 ? `${(val / 1000).toFixed(1)}k` : val}
-                />
-                <Tooltip 
-                  cursor={ { fill: '#0f172a' } }
-                  contentStyle={ { backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '0.75rem' } }
-                  itemStyle={ { color: '#38bdf8' } }
-                  labelStyle={ { color: '#94a3b8', textTransform: 'capitalize', marginBottom: '4px' } }
-                  formatter={(value: number) => [value, 'Records']}
-                  labelFormatter={(label: string) => label.replace('_', ' ')}
-                />
-                <Bar 
-                  dataKey="count" 
-                  fill="#0ea5e9" 
-                  radius={[4, 4, 0, 0]} 
-                  barSize={40}
-                  animationDuration={1500}
-                />
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {metadata.map((table) => {
+              const { data: chartData, isFallback, dateField } = getChartData(table)
+              const tableLoading = chartsLoading[table.name]
+              const tableError = chartsError[table.name]
+              const hasNoData = !tableLoading && (!tableData[table.name] || tableData[table.name].length === 0)
+
+              return (
+                <div key={table.name} className="p-6 bg-slate-900/30 border border-slate-900 rounded-2xl flex flex-col justify-between h-80">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h4 className="text-sm font-bold text-white capitalize font-outfit">
+                        {table.name.replace('_', ' ')}
+                      </h4>
+                      <p className="text-[10px] text-slate-500 mt-0.5">
+                        {isFallback ? 'Total records count fallback' : `Trend grouped by date (${dateField})`}
+                      </p>
+                    </div>
+                    <span className="text-[10px] px-2 py-0.5 bg-slate-800 text-slate-400 rounded-md font-mono">
+                      {table.count} total rows
+                    </span>
+                  </div>
+
+                  <div className="flex-1 w-full relative min-h-0 flex items-center justify-center">
+                    {tableLoading ? (
+                      <div className="w-full h-full flex flex-col gap-3 justify-center items-center animate-pulse">
+                        <div className="w-full h-40 bg-slate-800/20 rounded-xl" />
+                        <div className="w-1/3 h-3.5 bg-slate-800/20 rounded" />
+                      </div>
+                    ) : tableError ? (
+                      <div className="text-center p-4 border border-red-500/10 bg-red-500/5 rounded-xl">
+                        <p className="text-xs text-red-400 font-semibold">{tableError}</p>
+                      </div>
+                    ) : hasNoData ? (
+                      <div className="text-center py-8">
+                        <p className="text-xs text-slate-500 font-medium">No records available for this entity</p>
+                      </div>
+                    ) : (
+                      <div className="h-full w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={chartData} margin={ { top: 10, right: 10, left: -25, bottom: 0 } }>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
+                            <XAxis 
+                              dataKey="name" 
+                              stroke="#64748b" 
+                              fontSize={10} 
+                              tickLine={false}
+                              axisLine={false}
+                              tickFormatter={(val) => {
+                                if (isFallback) return val
+                                const parts = val.split('-')
+                                return parts.length >= 3 ? `${parts[1]}/${parts[2]}` : val
+                              }}
+                            />
+                            <YAxis 
+                              stroke="#64748b" 
+                              fontSize={10}
+                              tickLine={false}
+                              axisLine={false}
+                              tickFormatter={(val) => val >= 1000 ? `${(val / 1000).toFixed(1)}k` : val}
+                            />
+                            <Tooltip 
+                              cursor={ { fill: '#0f172a' } }
+                              contentStyle={ { backgroundColor: '#0f172a', borderColor: '#1e293b', borderRadius: '0.75rem' } }
+                              itemStyle={ { color: '#38bdf8' } }
+                              labelStyle={ { color: '#94a3b8', textTransform: 'capitalize', marginBottom: '4px' } }
+                              formatter={(value: number) => [value, 'Count']}
+                            />
+                            <Bar 
+                              dataKey="count" 
+                              fill="#0ea5e9" 
+                              radius={[4, 4, 0, 0]} 
+                              barSize={isFallback ? 50 : 25}
+                              animationDuration={1000}
+                            />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}

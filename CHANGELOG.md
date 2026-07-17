@@ -6,9 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
-## [0.3.6] — 2026-07-14
+## [0.3.7] — 2026-07-17
 
 ### Added
+- Integrated Live Dashboard Charts using real API endpoint data (`/api/{table}?limit=500`).
+- Rendered dynamic bar charts grouped by date for trend visualization when `created_at` or similar date columns are present.
+- Added graceful fallbacks displaying total row counts for entities lacking date columns.
+- Ensured graceful error handling and empty states for records natively within the dashboard.
+
+---
+
+## [0.3.6] — 2026-07-14
 - Implemented elegant empty state handling directly within `<SiriusTable>` for 0-record scenarios, featuring an intuitive CTA to add records.
 - Added a reusable `<SiriusToast>` component for non-blocking success and error notifications across all CRUD operations.
 - Added skeleton loading overlays to `<SiriusTable>` to prevent jarring layout shifts during data fetching and pagination.
