@@ -112,7 +112,12 @@
             <h2>3. Core Concepts</h2>
             
             <h3 id="schema-inference">3.1 Schema Inference</h3>
-            <p>When you pass a CSV or Excel file to Sirius, the engine uses <code>pandas</code> to read the headers and infer standard data types (Strings, Integers, Booleans, Floats). It sanitizes column names into safe SQL identifiers.</p>
+            <p>Sirius-CLI supports schema inference across multiple raw data formats:</p>
+            <ul>
+                <li><strong>CSV & Excel:</strong> The engine uses <code>pandas</code> to inspect column headers and infer standard types (Strings, Integers, Booleans, Floats) while sanitizing headers into clean SQL identifiers.</li>
+                <li><strong>JSON Ingestion:</strong> Ingests JSON arrays of objects and nested dictionaries. If nested structures are detected, the parser automatically flattens keys (e.g., <code>{"user": {"profile": {"age": 30}}}</code> becomes <code>user_profile_age</code>) and extracts relational sub-tables recursively.</li>
+                <li><strong>SQLite Databases:</strong> Introspects existing SQLite database files, extracting columns, constraints, and relational schemas directly via database metadata.</li>
+            </ul>
             
             <h3 id="relationship-mapping">3.2 Relationship Mapping</h3>
             <p>Sirius-CLI features an intelligent relationship resolver powered by the <code>inflect</code> library. If the engine detects a column ending in <code>_id</code> (e.g., <code>customer_id</code>), it will:</p>
