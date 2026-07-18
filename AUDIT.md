@@ -1,4 +1,4 @@
-# Sirius-CLI — Full Audit (v0.3.7)
+# Sirius-CLI — Full Audit (v0.3.8)
 
 ## What It Is
 
@@ -59,7 +59,7 @@ The `update` command regenerates backend and frontend for new tables/columns add
 
 ---
 
-## Current State (v0.3.7)
+## Current State (v0.3.8)
 
 | Feature | Status |
 |---|---|
@@ -87,6 +87,7 @@ The `update` command regenerates backend and frontend for new tables/columns add
 | React UI Component Library (SiriusTable, SiriusPagination, etc.) | ✅ Added in v0.3.3 |
 | UI Empty States & Toast Notifications | ✅ Added in v0.3.6 |
 | Live Dashboard Charts (Real API Data & Trend Visualization) | ✅ Added in v0.3.7 |
+| JSON Input Full Parity & Validation Heuristics | ✅ Added in v0.3.8 |
 
 ---
 
