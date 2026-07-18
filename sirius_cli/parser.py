@@ -499,3 +499,136 @@ def parse_sqlite_db(db_path: str) -> Dict[str, List[Dict[str, Any]]]:
 
     conn.close()
     return schemas
+
+
+def _flatten_dict(d: Dict[str, Any], prefix: str = "") -> Dict[str, Any]:
+    """Helper to flatten nested dictionaries inside a row."""
+    items: List[Any] = []
+    for k, v in d.items():
+        new_key = f"{prefix}{k}" if not prefix else f"{prefix}_{k}"
+        if isinstance(v, dict):
+            items.extend(_flatten_dict(v, new_key).items())
+        else:
+            items.append((new_key, v))
+    return dict(items)
+
+
+def _extract_raw_json_tables(
+    data: Any, default_table_name: str
+) -> Dict[str, List[Dict[str, Any]]]:
+    """Helper to extract relational tables and rows from raw JSON data."""
+    tables = {}
+    if isinstance(data, list):
+        rows = []
+        for item in data:
+            if isinstance(item, dict):
+                rows.append(_flatten_dict(item))
+        tables[default_table_name] = rows
+    elif isinstance(data, dict):
+        # Check if it has list of dicts values (multi-table JSON)
+        is_multi_table = False
+        if data:
+            is_multi_table = any(
+                isinstance(v, list) and all(isinstance(x, dict) for x in v if x)
+                for v in data.values()
+            )
+        if is_multi_table:
+            for k, v in data.items():
+                if isinstance(v, list):
+                    rows = []
+                    for item in v:
+                        if isinstance(item, dict):
+                            rows.append(_flatten_dict(item))
+                    tables[sanitize_table_name(k)] = rows
+        else:
+            tables[default_table_name] = [_flatten_dict(data)]
+    return tables
+
+
+def parse_json_files(json_paths: List[str]) -> Dict[str, List[Dict[str, Any]]]:
+    """Parses list of JSON paths, extracts schema types and infers relationships."""
+    schemas = {}
+    for path in json_paths:
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"JSON file not found: {path}")
+
+        default_table = sanitize_table_name(path)
+        with open(path, "r", encoding="utf-8") as f:
+            try:
+                data = json.load(f)
+            except json.JSONDecodeError as e:
+                raise ValueError(f"Invalid JSON file {path}: {e}")
+
+        tables = _extract_raw_json_tables(data, default_table)
+
+        for table_name, rows in tables.items():
+            if not rows:
+                continue
+
+            df = pd.DataFrame(rows)
+            columns = []
+            has_id = False
+
+            for col in df.columns:
+                san_col = sanitize_column_name(str(col))
+                col_type = map_pandas_type(
+                    df[col].dtype, df[col].dropna().head(5).tolist()
+                )
+
+                if san_col == "id":
+                    has_id = True
+                    columns.append(
+                        {
+                            "name": "id",
+                            "type": "Integer",
+                            "is_pk": True,
+                            "is_required": True,
+                        }
+                    )
+                else:
+                    col_dict: Dict[str, Any] = {
+                        "name": san_col,
+                        "type": col_type,
+                        "is_pk": False,
+                    }
+                    col_dict["is_required"] = not df[col].isnull().any()
+                    if col_type in ("Integer", "Float"):
+                        min_val = df[col].min()
+                        max_val = df[col].max()
+                        if pd.notna(min_val):
+                            col_dict["min_val"] = (
+                                float(min_val) if col_type == "Float" else int(min_val)
+                            )
+                        if pd.notna(max_val):
+                            col_dict["max_val"] = (
+                                float(max_val) if col_type == "Float" else int(max_val)
+                            )
+                    columns.append(col_dict)
+                    samples = df[col].dropna().tolist()
+                    if _is_phone_column(san_col, samples):
+                        col_dict["pattern"] = r"\+?[0-9\s\-()]{7,20}"
+                        col_dict["placeholder"] = "e.g., +1 (555) 000-0000"
+                    elif _is_zip_column(san_col, samples):
+                        col_dict["pattern"] = r"[a-zA-Z0-9\s\-]{3,10}"
+                        col_dict["placeholder"] = "e.g., 90210"
+                    else:
+                        enum_vals = _detect_enum_values(san_col, col_type, samples)
+                        if enum_vals:
+                            col_dict["enum_values"] = enum_vals
+
+            if not has_id:
+                columns.insert(
+                    0,
+                    {
+                        "name": "id",
+                        "type": "Integer",
+                        "is_pk": True,
+                        "is_required": True,
+                    },
+                )
+
+            schemas[table_name] = columns
+
+    _infer_relationships(schemas)
+
+    return schemas

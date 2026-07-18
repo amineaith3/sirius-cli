@@ -53,6 +53,7 @@ def run_preview(
     db_path: Optional[str] = None,
     csv_paths: Optional[List[str]] = None,
     excel_paths: Optional[List[str]] = None,
+    json_paths: Optional[List[str]] = None,
 ):
     app = FastAPI(title="Sirius Preview API")
 
@@ -173,6 +174,24 @@ def run_preview(
                 except Exception as e:
                     print(f"[WARNING] Failed to seed Excel file {path}: {e}")
 
+        if json_paths:
+            import json as _json
+            from sirius_cli.parser import _extract_raw_json_tables
+
+            for path in json_paths:
+                default_t = sanitize_table_name(path)
+                try:
+                    with open(path, "r", encoding="utf-8") as f:
+                        jdata = _json.load(f)
+                    jtables = _extract_raw_json_tables(jdata, default_t)
+                    for t_name, rows in jtables.items():
+                        if t_name not in tables or not rows:
+                            continue
+                        df = pd.DataFrame(rows)
+                        _seed_df(df, t_name)
+                except Exception as e:
+                    print(f"[WARNING] Failed to seed JSON file {path}: {e}")
+
     # Dependency
     def get_db():
         db = SessionLocal()
@@ -203,7 +222,6 @@ def run_preview(
                 raise HTTPException(status_code=404, detail="Item not found")
             return dict(result)
 
-        @app.post(f"/api/{table_name}")
         def create_item(item: Any, db: Session = Depends(get_db)):
             stmt = insert(table).values(**item.model_dump(exclude_unset=True))
             from typing import cast, Any
@@ -212,7 +230,9 @@ def run_preview(
             db.commit()
             return {"id": result.inserted_primary_key[0], **item.model_dump()}
 
-        @app.put(f"/api/{table_name}/{{item_id}}")
+        create_item.__annotations__["item"] = pydantic_create
+        app.add_api_route(f"/api/{table_name}", create_item, methods=["POST"])
+
         def update_item(item_id: int, item: Any, db: Session = Depends(get_db)):
             update_data = item.model_dump(exclude_unset=True)
             if not update_data:
@@ -225,6 +245,11 @@ def run_preview(
             if result.rowcount == 0:
                 raise HTTPException(status_code=404, detail="Item not found")
             return {"id": item_id, **update_data}
+
+        update_item.__annotations__["item"] = pydantic_update
+        app.add_api_route(
+            f"/api/{table_name}/{{item_id}}", update_item, methods=["PUT"]
+        )
 
         @app.delete(f"/api/{table_name}/{{item_id}}")
         def delete_item(item_id: int, db: Session = Depends(get_db)):

@@ -192,3 +192,81 @@ def test_parse_sqlite_with_validation(tmp_path):
 
     role_col = next(c for c in columns if c["name"] == "role")
     assert role_col["enum_values"] == ["admin", "user"]
+
+
+def test_parse_json_files(tmp_path):
+    import json
+    from sirius_cli.parser import parse_json_files
+
+    # 1. Test single table JSON structure
+    json_path1 = tmp_path / "customers.json"
+    customers_data = [
+        {
+            "id": 1,
+            "name": "Alice",
+            "phone": "+1-555-111-2222",
+            "zip": "90210",
+            "role": "admin",
+            "details": {"bio": "hello", "age": 30},
+        },
+        {
+            "id": 2,
+            "name": "Bob",
+            "phone": "+1-555-222-3333",
+            "zip": "10001",
+            "role": "user",
+            "details": {"bio": "world", "age": 25},
+        },
+        {
+            "id": 3,
+            "name": "Charlie",
+            "phone": "+1-555-333-4444",
+            "zip": "30301",
+            "role": "user",
+            "details": {"bio": "notes", "age": 35},
+        },
+    ]
+    with open(json_path1, "w", encoding="utf-8") as f:
+        json.dump(customers_data, f)
+
+    # 2. Test multi-table JSON structure (also checks FK inference)
+    json_path2 = tmp_path / "orders_data.json"
+    orders_data = {
+        "orders": [
+            {"id": 101, "customer_id": 1, "total": 99.99},
+            {"id": 102, "customer_id": 2, "total": 150.50},
+        ]
+    }
+    with open(json_path2, "w", encoding="utf-8") as f:
+        json.dump(orders_data, f)
+
+    schemas = parse_json_files([str(json_path1), str(json_path2)])
+
+    assert "customers" in schemas
+    assert "orders" in schemas
+
+    # Verify flattening of nested dictionary in customers
+    customers_cols = schemas["customers"]
+    assert any(
+        c["name"] == "details_bio" and c["type"] == "String" for c in customers_cols
+    )
+    assert any(
+        c["name"] == "details_age" and c["type"] == "Integer" for c in customers_cols
+    )
+
+    # Verify phone number and zip heuristics on single table
+    phone_col = next(c for c in customers_cols if c["name"] == "phone")
+    assert "pattern" in phone_col
+    assert phone_col["placeholder"] == "e.g., +1 (555) 000-0000"
+
+    zip_col = next(c for c in customers_cols if c["name"] == "zip")
+    assert "pattern" in zip_col
+    assert zip_col["placeholder"] == "e.g., 90210"
+
+    role_col = next(c for c in customers_cols if c["name"] == "role")
+    assert role_col["enum_values"] == ["admin", "user"]
+
+    # Verify FK inference (customer_id in orders pointing to customers.id)
+    orders_cols = schemas["orders"]
+    cust_id_col = next(c for c in orders_cols if c["name"] == "customer_id")
+    assert cust_id_col.get("foreign_key") == "customers.id"

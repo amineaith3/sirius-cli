@@ -6,13 +6,14 @@ import sqlite3
 import subprocess
 import typer
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import importlib.metadata
 from sirius_cli.parser import (
     parse_csv_files,
     parse_sqlite_db,
     parse_config_file,
     parse_excel_files,
+    parse_json_files,
     sanitize_table_name,
     sanitize_column_name,
 )
@@ -111,6 +112,58 @@ def seed_database_from_csvs(project_path: str, csv_paths: list):
                 fieldnames = list(df.columns)
             except Exception:
                 continue
+        elif ext == ".json":
+            try:
+                import json as _json
+                from sirius_cli.parser import _extract_raw_json_tables
+
+                with open(path, "r", encoding="utf-8") as f:
+                    jdata = _json.load(f)
+                default_table = sanitize_table_name(path)
+                jtables = _extract_raw_json_tables(jdata, default_table)
+                for t_name, t_rows in jtables.items():
+                    if not t_rows:
+                        continue
+                    cols = list(t_rows[0].keys())
+                    san_table = sanitize_table_name(t_name)
+                    san_cols = [sanitize_column_name(c) for c in cols]
+
+                    rows = []
+                    for row in t_rows:
+                        mapped_json_row: Dict[str, Any] = {}
+                        for k, v in row.items():
+                            sanitized_k = sanitize_column_name(str(k))
+                            if v == "" or v is None:
+                                mapped_json_row[sanitized_k] = None
+                            elif str(v).lower() == "true":
+                                mapped_json_row[sanitized_k] = 1
+                            elif str(v).lower() == "false":
+                                mapped_json_row[sanitized_k] = 0
+                            else:
+                                mapped_json_row[sanitized_k] = v
+                        rows.append(mapped_json_row)
+
+                    quoted_table = _quote_ident(san_table)
+                    cursor.execute(f"PRAGMA table_info({quoted_table});")
+                    existing_cols = {info[1] for info in cursor.fetchall()}
+
+                    valid_cols = [c for c in san_cols if c in existing_cols]
+                    if not valid_cols:
+                        continue
+
+                    placeholders = ", ".join(["?"] * len(valid_cols))
+                    quoted_cols = ", ".join([_quote_ident(c) for c in valid_cols])
+                    query = f"INSERT OR IGNORE INTO {quoted_table} ({quoted_cols}) VALUES ({placeholders});"
+
+                    data_to_insert = []
+                    for row in rows:
+                        row_tuple = tuple(row.get(c) for c in valid_cols)
+                        data_to_insert.append(row_tuple)
+
+                    cursor.executemany(query, data_to_insert)
+                continue
+            except Exception:
+                continue
         else:
             encodings_to_try = ["utf-8", "utf-16", "cp1252"]
             fieldnames = []
@@ -134,18 +187,18 @@ def seed_database_from_csvs(project_path: str, csv_paths: list):
 
         rows = []
         for row in all_rows:
-            mapped_row: dict = {}
+            mapped_csv_row: Dict[str, Any] = {}
             for k, v in row.items():
                 sanitized_k = sanitize_column_name(str(k))
                 if v == "" or v is None:
-                    mapped_row[sanitized_k] = None
+                    mapped_csv_row[sanitized_k] = None
                 elif str(v).lower() == "true":
-                    mapped_row[sanitized_k] = 1
+                    mapped_csv_row[sanitized_k] = 1
                 elif str(v).lower() == "false":
-                    mapped_row[sanitized_k] = 0
+                    mapped_csv_row[sanitized_k] = 0
                 else:
-                    mapped_row[sanitized_k] = v
-            rows.append(mapped_row)
+                    mapped_csv_row[sanitized_k] = v
+            rows.append(mapped_csv_row)
 
         if not rows:
             continue
@@ -187,6 +240,11 @@ def init(
         None,
         "--excel",
         help="Paths to input Excel (.xlsx/.xls) files (can declare multiple times)",
+    ),
+    json: Optional[List[str]] = typer.Option(
+        None,
+        "--json",
+        help="Paths to input JSON data files (can declare multiple times)",
     ),
     db: Optional[str] = typer.Option(
         None, "--db", help="Path to input SQLite database file"
@@ -236,10 +294,17 @@ def init(
 ):
     """Initializes a new FastAPI backend and React frontend stack from data files or configuration."""
     # Ensure one and only one source parameter is provided
-    inputs = [bool(csv), bool(excel), bool(db), bool(config), bool(from_url)]
+    inputs = [
+        bool(csv),
+        bool(excel),
+        bool(json),
+        bool(db),
+        bool(config),
+        bool(from_url),
+    ]
     if sum(inputs) != 1:
         typer.secho(
-            "Error: You must provide exactly one input option: --csv, --excel, --db, --config, or --from-url.",
+            "Error: You must provide exactly one input option: --csv, --excel, --json, --db, --config, or --from-url.",
             fg=typer.colors.RED,
             err=True,
         )
@@ -268,7 +333,17 @@ def init(
         elif excel_like:
             excel = excel_like
         elif json_like:
-            config = json_like[0]
+            import json as _json
+
+            try:
+                with open(json_like[0], "r", encoding="utf-8") as jf:
+                    jdata = _json.load(jf)
+                if isinstance(jdata, dict) and "entities" in jdata:
+                    config = json_like[0]
+                else:
+                    json = json_like
+            except Exception:
+                config = json_like[0]
 
     # If --auth is used and no password provided, generate a secure random one
     if auth and not admin_pass:
@@ -312,6 +387,16 @@ def init(
             if not project_name:
                 typer.secho(
                     "Error: Project name argument is required when using --excel.",
+                    fg=typer.colors.RED,
+                    err=True,
+                )
+                raise typer.Exit(code=1)
+        elif json:
+            schemas = parse_json_files(json)
+            resolved_theme = theme or "blue"
+            if not project_name:
+                typer.secho(
+                    "Error: Project name argument is required when using --json.",
                     fg=typer.colors.RED,
                     err=True,
                 )
@@ -420,8 +505,8 @@ def init(
             fg=typer.colors.GREEN,
         )
 
-        # Seed initial data if building from CSVs or Excel files
-        seed_paths = list(csv or []) + list(excel or [])
+        # Seed initial data if building from CSVs, Excel, or JSON files
+        seed_paths = list(csv or []) + list(excel or []) + list(json or [])
         if seed_paths and not no_seed:
             if db_type == "sqlite":
                 typer.echo("Seeding initial data from source files...")
@@ -484,6 +569,9 @@ def update(
     excel: Optional[List[str]] = typer.Option(
         None, "--excel", help="Paths to input Excel files"
     ),
+    json: Optional[List[str]] = typer.Option(
+        None, "--json", help="Paths to input JSON data files"
+    ),
     db: Optional[str] = typer.Option(None, "--db", help="Path to input SQLite db"),
     config: Optional[str] = typer.Option(
         None, "--config", "-c", help="Path to JSON config"
@@ -533,10 +621,17 @@ def update(
         )
         raise typer.Exit(code=1)
 
-    inputs = [bool(csv), bool(excel), bool(db), bool(config), bool(from_url)]
+    inputs = [
+        bool(csv),
+        bool(excel),
+        bool(json),
+        bool(db),
+        bool(config),
+        bool(from_url),
+    ]
     if sum(inputs) != 1:
         typer.secho(
-            "Error: You must provide exactly one input option: --csv, --excel, --db, --config, or --from-url.",
+            "Error: You must provide exactly one input option: --csv, --excel, --json, --db, --config, or --from-url.",
             fg=typer.colors.RED,
             err=True,
         )
@@ -564,7 +659,17 @@ def update(
         elif excel_like:
             excel = excel_like
         elif json_like:
-            config = json_like[0]
+            import json as _json
+
+            try:
+                with open(json_like[0], "r", encoding="utf-8") as jf:
+                    jdata = _json.load(jf)
+                if isinstance(jdata, dict) and "entities" in jdata:
+                    config = json_like[0]
+                else:
+                    json = json_like
+            except Exception:
+                config = json_like[0]
 
     # If --auth is used and no password provided, generate a secure random one
     if auth and not admin_pass:
@@ -595,6 +700,8 @@ def update(
             schemas = parse_csv_files(csv)
         elif excel:
             schemas = parse_excel_files(excel)
+        elif json:
+            schemas = parse_json_files(json)
         elif db:
             schemas = parse_sqlite_db(db)
         elif config:  # config
@@ -663,6 +770,9 @@ def preview(
     excel: Optional[List[str]] = typer.Option(
         None, "--excel", help="Paths to input Excel files"
     ),
+    json: Optional[List[str]] = typer.Option(
+        None, "--json", help="Paths to input JSON data files"
+    ),
     db: Optional[str] = typer.Option(None, "--db", help="Path to input SQLite db"),
     config: Optional[str] = typer.Option(
         None, "--config", "-c", help="Path to JSON config"
@@ -675,10 +785,17 @@ def preview(
     ),
 ):
     """Instantly preview a generated UI based on schema sources without creating files."""
-    inputs = [bool(csv), bool(excel), bool(db), bool(config), bool(from_url)]
+    inputs = [
+        bool(csv),
+        bool(excel),
+        bool(json),
+        bool(db),
+        bool(config),
+        bool(from_url),
+    ]
     if sum(inputs) != 1:
         typer.secho(
-            "Error: You must provide exactly one input option: --csv, --excel, --db, --config, or --from-url.",
+            "Error: You must provide exactly one input option: --csv, --excel, --json, --db, --config, or --from-url.",
             fg=typer.colors.RED,
             err=True,
         )
@@ -706,7 +823,17 @@ def preview(
         elif excel_like:
             excel = excel_like
         elif json_like:
-            config = json_like[0]
+            import json as _json
+
+            try:
+                with open(json_like[0], "r", encoding="utf-8") as jf:
+                    jdata = _json.load(jf)
+                if isinstance(jdata, dict) and "entities" in jdata:
+                    config = json_like[0]
+                else:
+                    json = json_like
+            except Exception:
+                config = json_like[0]
 
     typer.echo("Parsing schemas for preview...")
     try:
@@ -714,6 +841,8 @@ def preview(
             schemas = parse_csv_files(csv)
         elif excel:
             schemas = parse_excel_files(excel)
+        elif json:
+            schemas = parse_json_files(json)
         elif db:
             schemas = parse_sqlite_db(db)
         elif config:  # config
@@ -723,7 +852,14 @@ def preview(
         raise typer.Exit(code=1)
 
     typer.echo("Starting preview server...")
-    run_preview(schemas, port=port, db_path=db, csv_paths=csv, excel_paths=excel)
+    run_preview(
+        schemas,
+        port=port,
+        db_path=db,
+        csv_paths=csv,
+        excel_paths=excel,
+        json_paths=json,
+    )
 
 
 if __name__ == "__main__":

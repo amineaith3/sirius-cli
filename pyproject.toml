@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sirius-cli"
-version = "0.3.7"
+version = "0.3.8"
 description = "A rapid prototyping tool for generating containerized backend + frontend CRUD stacks from CSV/SQLite files."
 readme = "README.md"
 requires-python = ">=3.9"

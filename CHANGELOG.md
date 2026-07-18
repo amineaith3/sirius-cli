@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [0.3.8] — 2026-07-18
+
+### Added
+- Implemented **JSON Input Full Parity** across the ingestion engine (heuristic-based validation for phone/zip/enum, relation FK inference, and multi-table nested JSON flattening).
+- Refactored preview server routing to support dynamic Pydantic request body validation, preventing 422 errors and securing route endpoints.
+- Expanded testing suite to 71% coverage, adding dedicated test coverage for the JSON parser and JSON CLI flows.
+
+---
+
 ## [0.3.7] — 2026-07-17
 
 ### Added
