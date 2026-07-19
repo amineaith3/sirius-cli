@@ -23,14 +23,46 @@ Before using Sirius-CLI, ensure you have the following installed:
 
 ## Key Capabilities
 
-- **Automatic Relationship Mapping**: Automatically extracts foreign keys from databases and resolves CSV/Excel associations using naming heuristics (linking `[table]_id` fields), navigating irregular English plurals effortlessly.
-- **Auto-Seeding**: Automatically seeds the generated database with the entries inside the source CSV/Excel files during migration (if using SQLite).
-- **Relational Integrity**: Generates dropdowns in the UI for foreign keys and displays badges that navigate to parent entities.
-- **Native Form Validation**: Injects strict HTML5 `required`, `min`, `max`, and `type="email"` validation constraints into the generated frontend by directly inferring them from the source data (via SQLite `PRAGMAs` or Pandas null-checks).
-- **Enterprise Data Grid**: The generated tables feature server-side searching (`?search=`), server-side column sorting (`?order_by=`), and dual data export buttons (CSV and Excel `.xlsx`).
-- **Dashboard Analytics**: A built-in Recharts dashboard showing live dataset distribution and entity insights.
-- **Multiple Database Engines**: Target `SQLite` for rapid local prototyping, or generate `PostgreSQL` and `MySQL` ready projects out of the box using `--pg` and `--mysql`.
-- **Iterative Updates**: Use `sirius-init update` to safely inject new tables or columns into an existing scaffolded project.
+- **Multi-Source Ingestion & JSON Parity**: Ingest CSV, Excel (`.xlsx`), SQLite databases, or JSON configuration/arrays. Supports nested JSON flattening and multi-table relational extraction out of the box.
+- **Automatic FK & Pluralization Heuristics**: Automatically extracts foreign key relationships and maps irregular English plurals (e.g. `category_id -> categories`, `person_id -> people`) using the `inflect` library engine.
+- **Advanced Heuristic Form Validation**: Infer strict HTML5 inputs (`required`, `min`, `max`, `type="email"`, `type="tel"`, zip pattern validation) and native `<select>` dropdowns for low-cardinality enum columns.
+- **Live Dashboard Charts**: Built-in Recharts analytics components with live date trend visualization (`created_at` grouping) and total row fallbacks.
+- **Enterprise Data Grid & Cursor Pagination**: O(log n) cursor pagination, server-side search (`?search=`), server-side column sorting (`?order_by=`), and dual CSV + Excel exports.
+- **Polished UX & Component Library**: Reusable React components (`SiriusTable`, `SiriusPagination`, `SiriusBadge`, `SiriusDropdown`, `SiriusError`), skeleton loading overlays, non-blocking toast notifications, and 404 deleted parent FK navigation handling.
+- **Remote Data Fetching (`--from-url`)**: Fetch public datasets directly from HTTP/HTTPS URLs with local SHA-256 caching and streaming progress.
+- **Relational Navigation & Highlight**: FK badges dynamically resolve human-readable parent record names and smooth-scroll + flash-highlight target records via URL params.
+- **Multiple Database Targets**: Scaffold for SQLite by default, or target production-grade PostgreSQL (`--pg`) and MySQL (`--mysql`).
+- **JWT Auth Scaffold (`--auth`)**: Integrated bcrypt password hashing, JWT Bearer authentication routes, protected endpoint dependencies, and a React Login screen.
+- **In-Memory Instant Preview (`sirius-init preview`)**: Spin up an ephemeral backend + frontend preview directly in your browser without creating disk files.
+- **Iterative Updates (`sirius-init update`)**: Safely add new tables or columns to an existing project with automated Alembic migration autogeneration.
+
+---
+
+## How It Works
+
+```
+ Data Source (CSV, Excel, SQLite, JSON, or --from-url)
+                        │
+                        ▼
+           ┌─────────────────────────┐
+           │ Schema Inference Engine │  (Types, Nullability, Min/Max, Phone/Zip/Enum Heuristics)
+           └────────────┬────────────┘
+                        │
+                        ▼
+           ┌─────────────────────────┐
+           │  Relational Graph & FK  │  (Inflect Pluralization Heuristics & PRAGMAs)
+           └────────────┬────────────┘
+                        │
+                        ▼
+           ┌─────────────────────────┐
+           │ Jinja2 Code Generator   │
+           └────────────┬────────────┘
+                        │
+         ┌──────────────┴──────────────┐
+         ▼                             ▼
+FastAPI Backend + Alembic     React 18 + Tailwind CSS
+(SQLAlchemy, JWT, Pydantic)   (Sirius Component Library & Dashboard)
+```
 
 ---
 
@@ -56,10 +88,14 @@ sirius-init init store_system --csv examples/users.csv --csv examples/orders.csv
 sirius-init init store_system --excel examples/products.xlsx --theme amber
 ```
 
-### 2. Generating from Remote URLs
-Provide a public URL to a CSV, Excel, or JSON file. Sirius-CLI will download it, cache it locally (to prevent rate-limits on re-runs), and scaffold the app on the fly.
+### 2. Generating from Remote URLs (`--from-url`)
+Provide a public URL to a CSV, Excel, or JSON file. Sirius-CLI will stream-download it, cache it locally via SHA-256 (`~/.sirius_cache/`) to prevent rate-limits, and scaffold the app on the fly:
 ```bash
-sirius-init init remote_app --from-url https://raw.githubusercontent.com/datasets/gdp/master/data/gdp.csv
+# Public economic dataset
+sirius-init init remote_gdp --from-url https://raw.githubusercontent.com/datasets/gdp/master/data/gdp.csv --theme emerald
+
+# Remote JSON API dataset
+sirius-init init remote_users --from-url https://jsonplaceholder.typicode.com/users --theme sky
 ```
 
 ### 3. Target Production Databases

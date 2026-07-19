@@ -19,7 +19,7 @@
     <!-- Fixed Sidebar -->
     <aside class="sidebar">
         <div class="sidebar-header">
-            <div class="logo">Sirius-CLI <span class="version">v0.3.8</span></div>
+            <div class="logo">Sirius-CLI <span class="version">v0.3.9</span></div>
             <button id="theme-toggle" class="theme-btn" aria-label="Toggle Theme">
                 <!-- SVG injected via JS -->
             </button>
@@ -130,11 +130,14 @@
             <p>This happens automatically without requiring manual configuration files.</p>
 
             <h3 id="form-validation">3.3 Dynamic Form Validation</h3>
-            <p>Generated React CRUD forms are strictly validated based on inferred data constraints natively via HTML5:</p>
+            <p>Generated React CRUD forms are strictly validated based on inferred data constraints natively via HTML5 and heuristic parsing:</p>
             <ul>
                 <li><strong>Required Fields:</strong> Reads <code>NOT NULL</code> constraints via <code>PRAGMA table_info</code> (SQLite) or infers <code>isnull()</code> heuristics (Pandas) to automatically inject <code>required</code> attributes.</li>
                 <li><strong>Numeric Bounds:</strong> Extracts <code>min</code> and <code>max</code> extremes from CSV/Excel data and sets them on numeric inputs.</li>
                 <li><strong>Email Regex:</strong> Automatically tags column names containing "email" with <code>type="email"</code>.</li>
+                <li><strong>Phone Number Validation:</strong> Automatically detects phone column identifiers (<code>phone</code>, <code>mobile</code>, <code>tel</code>, <code>fax</code>) and injects <code>type="tel"</code> with standardized pattern validation rules.</li>
+                <li><strong>ZIP Code Formatting:</strong> Identifies postal/ZIP code fields and enforces regex pattern matching (e.g. 5-digit US ZIPs or postal formats).</li>
+                <li><strong>Native Enum Dropdowns:</strong> Detects low-cardinality string columns (e.g., status fields with discrete unique values like <code>"active"</code>, <code>"pending"</code>, <code>"archived"</code>) and renders native HTML <code>&lt;select&gt;</code> dropdowns populated with pre-discovered enum values.</li>
             </ul>
 
             <h3 id="server-side-operations">3.4 Server-Side Search & Sorting</h3>
