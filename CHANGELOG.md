@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [0.3.9] — 2026-07-19
+
+### Added
+- Refreshed project `README.md` with complete v0.3.x Key Capabilities breakdown and architectural "How It Works" workflow diagram.
+- Enhanced `--from-url` flag documentation with real public dataset examples (economic CSVs and REST API JSON data).
+- Updated `docs/index.html` technical documentation to detail advanced form validation heuristics (phone numbers, zip codes, and native enum `<select>` selectors).
+- Synchronized version metadata to `0.3.9` across all configuration files and documentation sites.
+
+---
+
 ## [0.3.8] — 2026-07-18
 
 ### Added
