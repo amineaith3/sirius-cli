@@ -1,5 +1,6 @@
 import os
 from jinja2 import Environment, FileSystemLoader
+from sirius_cli.backends.base import BackendStrategy
 
 TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "templates")
 
@@ -22,6 +23,7 @@ def render_template(env, template_name, dest_path, **kwargs):
 def generate_project(
     project_path: str,
     schemas: dict,
+    backend_strategy: BackendStrategy,
     project_name: str = "app",
     theme: str = "blue",
     port: int = 8000,
@@ -55,27 +57,8 @@ def generate_project(
         **ctx,
     )
 
-    # 2. Backend FastAPI application files
-    backend_path = os.path.join(project_path, "backend")
-
-    backend_templates = {
-        "backend/database.py.jinja2": "database.py",
-        "backend/models.py.jinja2": "models.py",
-        "backend/schemas.py.jinja2": "schemas.py",
-        "backend/main.py.jinja2": "main.py",
-        "backend/requirements.txt.jinja2": "requirements.txt",
-        "backend/Dockerfile.jinja2": "Dockerfile",
-    }
-
-    if auth:
-        backend_templates["backend/auth.py.jinja2"] = "auth.py"
-
-    for t_path, dest_name in backend_templates.items():
-        render_template(env, t_path, os.path.join(backend_path, dest_name), **ctx)
-
-    # Write init file to make backend a python package
-    with open(os.path.join(backend_path, "__init__.py"), "w") as f:
-        f.write("# backend package\n")
+    # 2. Generate Backend-specific files using Strategy
+    backend_strategy.generate_files(project_path, ctx)
 
     # Generate .env.example for production documentation
     _generate_env_example(project_path, db_type, auth, port)
@@ -168,22 +151,3 @@ def _generate_env_example(project_path: str, db_type: str, auth: bool, port: int
     os.makedirs(project_path, exist_ok=True)
     with open(env_example_path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
-
-
-def render_alembic_files(backend_path: str, schemas: dict):
-    """Helper to render Alembic migration template files after init command is run."""
-    env = get_env()
-    # Render env.py config
-    render_template(
-        env,
-        "backend/alembic/env.py.jinja2",
-        os.path.join(backend_path, "alembic", "env.py"),
-        schemas=schemas,
-    )
-    # Render script.py.mako template
-    render_template(
-        env,
-        "backend/alembic/script.py.mako.jinja2",
-        os.path.join(backend_path, "alembic", "script.py.mako"),
-        schemas=schemas,
-    )

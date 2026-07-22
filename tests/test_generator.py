@@ -2,6 +2,8 @@ import os
 from sirius_cli.generator import generate_project
 
 
+from sirius_cli.backends.fastapi import FastAPIBackendStrategy
+
 def test_generate_project(tmp_project_dir):
     # Mock schema matching the format output by the parser
     mock_schema = {
@@ -28,6 +30,7 @@ def test_generate_project(tmp_project_dir):
     generate_project(
         project_path=out_dir,
         schemas=mock_schema,
+        backend_strategy=FastAPIBackendStrategy(),
         project_name=project_name,
         theme="blue",
         port=8000,

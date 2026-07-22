@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [0.4.1] — 2026-07-22
+
+### Added
+- Refactored core generation logic using the **Strategy Pattern** to support pluggable backends.
+- Implemented `FastAPIBackendStrategy` encapsulating all FastAPI template rendering, Alembic migrations execution, and database seeding.
+- Added `--backend` option to `init` and `update` commands.
+- Relocated and organized templates under `sirius_cli/templates/backends/fastapi/`.
+
+---
+
 ## [0.3.9] — 2026-07-19
 
 ### Added
