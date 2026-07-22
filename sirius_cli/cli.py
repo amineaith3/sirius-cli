@@ -1,12 +1,7 @@
 import os
-import csv
-import re
 import secrets
-import sqlite3
-import subprocess
 import typer
-from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
 import importlib.metadata
 from sirius_cli.parser import (
     parse_csv_files,
@@ -14,54 +9,15 @@ from sirius_cli.parser import (
     parse_config_file,
     parse_excel_files,
     parse_json_files,
-    sanitize_table_name,
-    sanitize_column_name,
 )
-from sirius_cli.generator import generate_project, render_alembic_files
+from sirius_cli.generator import generate_project
 from sirius_cli.preview import run_preview
 from sirius_cli.fetcher import fetch_remote_file
+from sirius_cli.backends import get_backend_strategy
 
 app = typer.Typer(
     help="Sirius-CLI: A rapid prototyping backend and frontend code generator."
 )
-
-# --- Security helpers ---
-
-# Regex pattern for valid SQL identifiers (alphanumeric + underscore, must start with letter or _)
-_VALID_SQL_IDENT = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
-
-
-def _quote_ident(name: str) -> str:
-    """Double-quote a SQL identifier after validating it contains only safe characters.
-    This prevents SQL injection through table or column names."""
-    if not _VALID_SQL_IDENT.match(name):
-        raise ValueError(f"Invalid SQL identifier: {name!r}")
-    return f'"{name}"'
-
-
-def _find_alembic() -> Optional[str]:
-    """Locate the alembic executable, preferring the one in the current Python environment."""
-    import shutil
-
-    alembic_path = shutil.which("alembic")
-    if alembic_path:
-        return alembic_path
-    # Fallback: try running via python -m alembic
-    return None
-
-
-def _run_alembic(args: list, cwd: str, env: Optional[dict] = None):
-    """Run an alembic command safely without shell=True."""
-    alembic_path = _find_alembic()
-    if alembic_path:
-        cmd = [alembic_path] + args
-    else:
-        # Fallback: run as python module
-        import sys
-
-        cmd = [sys.executable, "-m", "alembic"] + args
-
-    subprocess.run(cmd, cwd=cwd, check=True, env=env, stdout=subprocess.DEVNULL)
 
 
 def version_callback(value: bool):
@@ -86,146 +42,6 @@ def main(
     )
 ):
     pass
-
-
-def seed_database_from_csvs(project_path: str, csv_paths: list):
-    """Seeds the generated SQLite database with the row entries from the source CSVs."""
-    db_path = os.path.join(project_path, "backend", "app.db")
-    if not os.path.exists(db_path):
-        return
-
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-
-    for path in csv_paths:
-        if not os.path.exists(path):
-            continue
-
-        # Normalise xlsx → in-memory CSV rows via pandas
-        ext = Path(path).suffix.lower()
-        if ext in (".xlsx", ".xls"):
-            try:
-                import pandas as pd
-
-                df = pd.read_excel(path)
-                all_rows = df.to_dict(orient="records")
-                fieldnames = list(df.columns)
-            except Exception:
-                continue
-        elif ext == ".json":
-            try:
-                import json as _json
-                from sirius_cli.parser import _extract_raw_json_tables
-
-                with open(path, "r", encoding="utf-8") as f:
-                    jdata = _json.load(f)
-                default_table = sanitize_table_name(path)
-                jtables = _extract_raw_json_tables(jdata, default_table)
-                for t_name, t_rows in jtables.items():
-                    if not t_rows:
-                        continue
-                    cols = list(t_rows[0].keys())
-                    san_table = sanitize_table_name(t_name)
-                    san_cols = [sanitize_column_name(c) for c in cols]
-
-                    rows = []
-                    for row in t_rows:
-                        mapped_json_row: Dict[str, Any] = {}
-                        for k, v in row.items():
-                            sanitized_k = sanitize_column_name(str(k))
-                            if v == "" or v is None:
-                                mapped_json_row[sanitized_k] = None
-                            elif str(v).lower() == "true":
-                                mapped_json_row[sanitized_k] = 1
-                            elif str(v).lower() == "false":
-                                mapped_json_row[sanitized_k] = 0
-                            else:
-                                mapped_json_row[sanitized_k] = v
-                        rows.append(mapped_json_row)
-
-                    quoted_table = _quote_ident(san_table)
-                    cursor.execute(f"PRAGMA table_info({quoted_table});")
-                    existing_cols = {info[1] for info in cursor.fetchall()}
-
-                    valid_cols = [c for c in san_cols if c in existing_cols]
-                    if not valid_cols:
-                        continue
-
-                    placeholders = ", ".join(["?"] * len(valid_cols))
-                    quoted_cols = ", ".join([_quote_ident(c) for c in valid_cols])
-                    query = f"INSERT OR IGNORE INTO {quoted_table} ({quoted_cols}) VALUES ({placeholders});"
-
-                    data_to_insert = []
-                    for row in rows:
-                        row_tuple = tuple(row.get(c) for c in valid_cols)
-                        data_to_insert.append(row_tuple)
-
-                    cursor.executemany(query, data_to_insert)
-                continue
-            except Exception:
-                continue
-        else:
-            encodings_to_try = ["utf-8", "utf-16", "cp1252"]
-            fieldnames = []
-            all_rows = []
-            for enc in encodings_to_try:
-                try:
-                    with open(path, "r", encoding=enc) as f:
-                        reader = csv.DictReader(f)
-                        if reader.fieldnames:
-                            fieldnames = list(reader.fieldnames)
-                            all_rows = list(reader)
-                    break
-                except UnicodeDecodeError:
-                    continue
-
-            if not fieldnames:
-                continue
-
-        table_name = sanitize_table_name(path)
-        cols = [sanitize_column_name(c) for c in fieldnames]
-
-        rows = []
-        for row in all_rows:
-            mapped_csv_row: Dict[str, Any] = {}
-            for k, v in row.items():
-                sanitized_k = sanitize_column_name(str(k))
-                if v == "" or v is None:
-                    mapped_csv_row[sanitized_k] = None
-                elif str(v).lower() == "true":
-                    mapped_csv_row[sanitized_k] = 1
-                elif str(v).lower() == "false":
-                    mapped_csv_row[sanitized_k] = 0
-                else:
-                    mapped_csv_row[sanitized_k] = v
-            rows.append(mapped_csv_row)
-
-        if not rows:
-            continue
-
-        # Verify columns exist in target table using quoted identifier
-        quoted_table = _quote_ident(table_name)
-        cursor.execute(f"PRAGMA table_info({quoted_table});")
-        existing_cols = {info[1] for info in cursor.fetchall()}
-
-        valid_cols = [c for c in cols if c in existing_cols]
-        if not valid_cols:
-            continue
-
-        # Build query with quoted identifiers for defense-in-depth
-        placeholders = ", ".join(["?"] * len(valid_cols))
-        quoted_cols = ", ".join([_quote_ident(c) for c in valid_cols])
-        query = f"INSERT OR IGNORE INTO {quoted_table} ({quoted_cols}) VALUES ({placeholders});"
-
-        data_to_insert = []
-        for row in rows:
-            row_tuple = tuple(row.get(c) for c in valid_cols)
-            data_to_insert.append(row_tuple)
-
-        cursor.executemany(query, data_to_insert)
-
-    conn.commit()
-    conn.close()
 
 
 @app.command()
@@ -291,8 +107,31 @@ def init(
         "--from-url",
         help="URL(s) of a public CSV/JSON/Excel file to fetch and scaffold from (repeatable)",
     ),
+    backend: str = typer.Option(
+        "fastapi",
+        "--backend",
+        help="Backend framework to generate (fastapi, flask, django)",
+    ),
 ):
     """Initializes a new FastAPI backend and React frontend stack from data files or configuration."""
+    if backend not in ("fastapi", "flask", "django"):
+        typer.secho(
+            f"Error: Unsupported backend '{backend}'. Supported options: fastapi, flask, django.",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    if backend in ("flask", "django"):
+        typer.secho(
+            f"Error: Backend '{backend}' is not supported yet. Coming in a future release!",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    backend_strategy = get_backend_strategy(backend)
+
     # Ensure one and only one source parameter is provided
     inputs = [
         bool(csv),
@@ -438,6 +277,7 @@ def init(
         generate_project(
             dest_dir,
             schemas,
+            backend_strategy,
             project_name=project_name,
             theme=resolved_theme,
             port=port,
@@ -451,92 +291,40 @@ def init(
         typer.secho(f"Error generating files: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
 
-    backend_path = os.path.join(dest_dir, "backend")
+    ctx = dict(
+        schemas=schemas,
+        project_name=project_name,
+        theme=resolved_theme,
+        port=port,
+        api_url=resolved_api_url,
+        db_type=db_type,
+        auth=auth,
+        admin_user=admin_user,
+        admin_pass=admin_pass,
+    )
+    backend_strategy.post_init_setup(dest_dir, ctx)
 
-    typer.echo("Initializing Alembic migration system...")
-    try:
-        # Run alembic init (no shell=True)
-        _run_alembic(["init", "alembic"], cwd=backend_path)
-
-        # Write custom alembic migration runner templates
-        render_alembic_files(backend_path, schemas)
-
-        # Modify alembic.ini target database config
-        alembic_ini = os.path.join(backend_path, "alembic.ini")
-        if os.path.exists(alembic_ini):
-            with open(alembic_ini, "r") as f:
-                content = f.read()
-            if db_type == "sqlite":
-                content = content.replace(
-                    "sqlalchemy.url = driver://user:pass@localhost/dbname",
-                    "sqlalchemy.url = sqlite:///./app.db",
-                )
-            elif db_type == "pg":
-                content = content.replace(
-                    "sqlalchemy.url = driver://user:pass@localhost/dbname",
-                    # ⚠ CHANGE CREDENTIALS IN PRODUCTION
-                    "sqlalchemy.url = postgresql://postgres:postgres@localhost:5432/app",
-                )
-            elif db_type == "mysql":
-                content = content.replace(
-                    "sqlalchemy.url = driver://user:pass@localhost/dbname",
-                    # ⚠ CHANGE CREDENTIALS IN PRODUCTION
-                    "sqlalchemy.url = mysql+pymysql://root:root@localhost:3306/app",
-                )
-            with open(alembic_ini, "w") as f:
-                f.write(content)
-
-        # Generate initial autogenerated migration script (no shell=True)
-        typer.echo("Autogenerating migration scripts...")
-        env = os.environ.copy()
-        env["PYTHONPATH"] = dest_dir + os.pathsep + env.get("PYTHONPATH", "")
-        _run_alembic(
-            ["revision", "--autogenerate", "-m", "Initial migration"],
-            cwd=backend_path,
-            env=env,
-        )
-
-        # Apply initial migration structure to SQLite db (no shell=True)
-        typer.echo("Running database migrations...")
-        _run_alembic(["upgrade", "head"], cwd=backend_path, env=env)
-
-        typer.secho(
-            "[OK] Alembic migration system initialized successfully!",
-            fg=typer.colors.GREEN,
-        )
-
-        # Seed initial data if building from CSVs, Excel, or JSON files
-        seed_paths = list(csv or []) + list(excel or []) + list(json or [])
-        if seed_paths and not no_seed:
-            if db_type == "sqlite":
-                typer.echo("Seeding initial data from source files...")
-                try:
-                    seed_database_from_csvs(dest_dir, seed_paths)
-                    typer.secho(
-                        "[OK] Database seeded successfully!", fg=typer.colors.GREEN
-                    )
-                except Exception as se:
-                    typer.secho(
-                        f"[WARNING] Database seeding failed: {se}",
-                        fg=typer.colors.YELLOW,
-                    )
-            else:
+    # Seed initial data if building from CSVs, Excel, or JSON files
+    seed_paths = list(csv or []) + list(excel or []) + list(json or [])
+    if seed_paths and not no_seed:
+        if db_type == "sqlite":
+            typer.echo("Seeding initial data from source files...")
+            try:
+                backend_strategy.seed_data(dest_dir, seed_paths)
+                typer.secho("[OK] Database seeded successfully!", fg=typer.colors.GREEN)
+            except Exception as se:
                 typer.secho(
-                    "[SKIP] CSV/Excel seeding is only supported for SQLite at scaffold time. Skipping.",
+                    f"[WARNING] Database seeding failed: {se}",
                     fg=typer.colors.YELLOW,
                 )
-        elif no_seed:
+        else:
             typer.secho(
-                "[SKIP] Database seeding skipped (--no-seed).", fg=typer.colors.YELLOW
+                "[SKIP] CSV/Excel seeding is only supported for SQLite at scaffold time. Skipping.",
+                fg=typer.colors.YELLOW,
             )
-
-    except Exception as e:
+    elif no_seed:
         typer.secho(
-            f"[WARNING] Autogenerated Alembic migration failed: {e}",
-            fg=typer.colors.YELLOW,
-        )
-        typer.echo(
-            "You can configure database credentials and run migrations manually later."
+            "[SKIP] Database seeding skipped (--no-seed).", fg=typer.colors.YELLOW
         )
 
     typer.secho(
@@ -611,8 +399,31 @@ def update(
         "--from-url",
         help="URL(s) of a public CSV/JSON/Excel file to fetch and scaffold from (repeatable)",
     ),
+    backend: str = typer.Option(
+        "fastapi",
+        "--backend",
+        help="Backend framework to generate (fastapi, flask, django)",
+    ),
 ):
     """Updates an existing project with new columns/tables."""
+    if backend not in ("fastapi", "flask", "django"):
+        typer.secho(
+            f"Error: Unsupported backend '{backend}'. Supported options: fastapi, flask, django.",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    if backend in ("flask", "django"):
+        typer.secho(
+            f"Error: Backend '{backend}' is not supported yet. Coming in a future release!",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    backend_strategy = get_backend_strategy(backend)
+
     if not os.path.exists(project_path):
         typer.secho(
             f"Error: Project path '{project_path}' does not exist.",
@@ -719,6 +530,7 @@ def update(
         generate_project(
             project_path,
             schemas,
+            backend_strategy,
             project_name=project_name,
             theme=theme,
             port=port,
@@ -732,28 +544,18 @@ def update(
         typer.secho(f"Error generating files: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
 
-    backend_path = os.path.join(project_path, "backend")
-
-    typer.echo("Generating Alembic migration...")
-    env = os.environ.copy()
-    env["PYTHONPATH"] = project_path + os.pathsep + env.get("PYTHONPATH", "")
-    try:
-        # Safe: message is passed as a list element, not interpolated into a shell string
-        _run_alembic(
-            ["revision", "--autogenerate", "-m", message], cwd=backend_path, env=env
-        )
-
-        typer.echo("Running database migrations...")
-        _run_alembic(["upgrade", "head"], cwd=backend_path, env=env)
-        typer.secho("[OK] Database schema updated successfully!", fg=typer.colors.GREEN)
-    except Exception as e:
-        typer.secho(
-            f"[WARNING] Autogenerated Alembic migration failed: {e}",
-            fg=typer.colors.YELLOW,
-        )
-        typer.echo(
-            "You can configure database credentials and run migrations manually later."
-        )
+    ctx = dict(
+        schemas=schemas,
+        project_name=project_name,
+        theme=theme,
+        port=port,
+        api_url=resolved_api_url,
+        db_type=db_type,
+        auth=auth,
+        admin_user=admin_user,
+        admin_pass=admin_pass,
+    )
+    backend_strategy.post_update_setup(project_path, ctx, message)
 
     typer.secho(
         f"\n[SUCCESS] Project '{project_path}' has been updated.",

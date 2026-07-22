@@ -134,7 +134,7 @@ def test_cli_update_json(tmp_project_dir, tmp_path):
 
 
 def test_seed_database_from_csvs(tmp_path):
-    from sirius_cli.cli import seed_database_from_csvs
+    from sirius_cli.backends.fastapi import FastAPIBackendStrategy
     import sqlite3
     import pandas as pd
     import json
@@ -175,9 +175,9 @@ def test_seed_database_from_csvs(tmp_path):
     with open(json_file, "w", encoding="utf-8") as f:
         json.dump(json_data, f)
 
-    # 3. Call seed_database_from_csvs
+    # 3. Call seed_data via Strategy
     seed_paths = [str(csv_file), str(excel_file), str(json_file)]
-    seed_database_from_csvs(str(project_dir), seed_paths)
+    FastAPIBackendStrategy().seed_data(str(project_dir), seed_paths)
 
     # 4. Verify sqlite database contents
     conn = sqlite3.connect(str(db_path))
