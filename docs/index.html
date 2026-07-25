@@ -62,7 +62,7 @@
                 </li>
                 <li><a href="#architecture" class="nav-link">5. Architecture Deep Dive</a>
                     <ul>
-                        <li><a href="#arch-backend" class="nav-link sub">5.1 Backend (FastAPI)</a></li>
+                        <li><a href="#arch-backend" class="nav-link sub">5.1 Backend (FastAPI / Flask)</a></li>
                         <li><a href="#arch-frontend" class="nav-link sub">5.2 Frontend (React)</a></li>
                         <li><a href="#arch-migrations" class="nav-link sub">5.3 Migrations (Alembic)</a></li>
                     </ul>
@@ -143,7 +143,7 @@
             <h3 id="server-side-operations">3.4 Server-Side Search & Sorting</h3>
             <p>Sirius-CLI does not rely on fragile client-side filtering. Instead:</p>
             <ul>
-                <li><strong>Search:</strong> A debounced (350ms) search input fires a <code>?search=</code> query. The FastAPI backend queries the database using standard wildcard string matching across all text fields.</li>
+                <li><strong>Search:</strong> A debounced (350ms) search input fires a <code>?search=</code> query. The FastAPI/Flask backend queries the database using standard wildcard string matching across all text fields.</li>
                 <li><strong>Sorting:</strong> Clicking table headers toggles a server-side <code>?order_by=</code> and <code>?dir=</code> API request.</li>
             </ul>
 
@@ -155,7 +155,7 @@
             </ul>
 
             <h3 id="data-export">3.6 Data Exporting</h3>
-            <p>Every generated data table features one-click bulk exports directly to standard formats. The FastAPI backend streams the entire current dataset matching active search and sort parameters directly to the browser as either a <code>.csv</code> or binary <code>.xlsx</code> (Excel) file.</p>
+            <p>Every generated data table features one-click bulk exports directly to standard formats. The FastAPI/Flask backend streams the entire current dataset matching active search and sort parameters directly to the browser as either a <code>.csv</code> or binary <code>.xlsx</code> (Excel) file.</p>
         </section>
 
         <section id="cli-reference">
@@ -193,6 +193,10 @@
                         <tr>
                             <td><code>--config, -c</code></td>
                             <td>Path to a JSON configuration defining explicit schema.</td>
+                        </tr>
+                        <tr>
+                            <td><code>--backend</code></td>
+                            <td>Backend framework to generate: <code>fastapi</code> (default) or <code>flask</code> (Django support planned).</td>
                         </tr>
                         <tr>
                             <td><code>--theme, -t</code></td>
@@ -255,12 +259,24 @@
             <h2>5. Architecture Deep Dive</h2>
             <p>Sirius-CLI does not hide its generated code behind abstraction layers. It outputs raw, standard Python and TypeScript files that you own and can edit freely.</p>
 
-            <h3 id="arch-backend">5.1 Backend (FastAPI)</h3>
+            <h3 id="arch-backend">5.1 Backend (FastAPI / Flask)</h3>
+            <p>Sirius-CLI scaffolds your backend using either <strong>FastAPI</strong> (default) or <strong>Flask</strong> (via the <code>--backend=flask</code> flag). Both architectures generate clean, fully typed Python codebases:</p>
             <ul>
-                <li><strong><code>main.py</code></strong>: The core FastAPI router. Automatically generates fully functional CRUD endpoints for every table. Includes server-side <code>?search=</code> and <code>?order_by=</code> handlers, and <code>/export</code> endpoints generating CSVs and Excel files.</li>
-                <li><strong><code>database.py</code></strong>: Configures the SQLAlchemy <code>SessionLocal</code> pool. For Postgres/MySQL, it enforces reading the connection string from the <code>DATABASE_URL</code> environment variable.</li>
-                <li><strong><code>models.py</code></strong>: Generates strict SQLAlchemy declarative base models with correct foreign key mappings and indexes.</li>
-                <li><strong><code>schemas.py</code></strong>: Generates Pydantic v2 models (Create, Update, Response) for strict request validation and serialization.</li>
+                <li><strong><code>main.py</code></strong>: The core application entrypoint.
+                    <ul>
+                        <li><em>FastAPI:</em> Configures a FastAPI router with dependency injection for databases and schemas, exposing interactive Swagger API docs (<code>/docs</code>).</li>
+                        <li><em>Flask:</em> Follows the application factory pattern with blueprints for route modularity. Uses Gunicorn as the production WSGI server.</li>
+                        <li>Both frameworks feature server-side <code>?search=</code>, sorting, cursor-based pagination, and binary <code>/export</code> endpoints.</li>
+                    </ul>
+                </li>
+                <li><strong><code>database.py</code></strong>: Configures SQLAlchemy connection pools and session management.
+                    <ul>
+                        <li><em>FastAPI:</em> Uses a custom SQLAlchemy <code>SessionLocal</code> session factory and generator-based dependencies (<code>get_db</code>).</li>
+                        <li><em>Flask:</em> Uses <code>Flask-SQLAlchemy</code> and <code>Flask-Migrate</code> for database integration.</li>
+                    </ul>
+                </li>
+                <li><strong><code>models.py</code></strong>: Generates strict SQLAlchemy declarative models with appropriate foreign key relationships, indexes, and cascades.</li>
+                <li><strong><code>schemas.py</code></strong>: Generates Pydantic v2 schemas used for strict request payload validation and response serialization in both backend flavors.</li>
             </ul>
 
             <h3 id="arch-frontend">5.2 Frontend (React + Vite)</h3>
@@ -282,7 +298,11 @@
             <h2>6. Security & Authentication</h2>
             
             <h3>JWT Implementation</h3>
-            <p>When the <code>--auth</code> flag is provided, Sirius generates an <code>auth.py</code> file containing OAuth2 Password Bearer logic via <code>python-jose</code> and <code>passlib</code>. All standard endpoints in <code>main.py</code> are subsequently injected with a <code>Depends(get_current_user)</code> dependency.</p>
+            <p>When the <code>--auth</code> flag is provided, Sirius generates scaffolding to secure API routes:</p>
+            <ul>
+                <li><em>FastAPI:</em> Generates an <code>auth.py</code> file containing OAuth2 Password Bearer logic via <code>python-jose</code> and <code>passlib</code>. Endpoints in <code>main.py</code> are protected with a <code>Depends(get_current_user)</code> dependency.</li>
+                <li><em>Flask:</em> Generates an <code>auth.py</code> blueprint utilizing <code>Flask-JWT-Extended</code>. Endpoints in <code>main.py</code> are protected using the <code>@jwt_required()</code> decorator.</li>
+            </ul>
             
             <h3>Production Checklist</h3>
             <div class="alert warning">
