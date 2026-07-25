@@ -1,9 +1,11 @@
 from typing import Dict, Type
 from sirius_cli.backends.base import BackendStrategy
 from sirius_cli.backends.fastapi import FastAPIBackendStrategy
+from sirius_cli.backends.flask import FlaskBackendStrategy
 
 BACKEND_STRATEGIES: Dict[str, Type[BackendStrategy]] = {
     "fastapi": FastAPIBackendStrategy,
+    "flask": FlaskBackendStrategy,
 }
 
 

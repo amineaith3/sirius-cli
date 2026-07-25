@@ -113,7 +113,7 @@ def init(
         help="Backend framework to generate (fastapi, flask, django)",
     ),
 ):
-    """Initializes a new FastAPI backend and React frontend stack from data files or configuration."""
+    """Initializes a new backend and React frontend stack from data files or configuration."""
     if backend not in ("fastapi", "flask", "django"):
         typer.secho(
             f"Error: Unsupported backend '{backend}'. Supported options: fastapi, flask, django.",
@@ -122,9 +122,9 @@ def init(
         )
         raise typer.Exit(code=1)
 
-    if backend in ("flask", "django"):
+    if backend == "django":
         typer.secho(
-            f"Error: Backend '{backend}' is not supported yet. Coming in a future release!",
+            "Error: Backend 'django' is not supported yet. Coming in a future release!",
             fg=typer.colors.RED,
             err=True,
         )
