@@ -1,0 +1,39 @@
+import os
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
+
+db = SQLAlchemy()
+migrate = Migrate()
+
+
+def init_db(app):
+    """Bind SQLAlchemy and Flask-Migrate to the Flask app."""
+{% if db_type == 'pg' %}
+    # PostgreSQL connection
+    # ⚠ PRODUCTION: Set the DATABASE_URL environment variable with your real credentials.
+    #   Example: DATABASE_URL=postgresql://user:password@host:5432/dbname
+    app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
+        "DATABASE_URL",
+        "postgresql://postgres:postgres@localhost:5432/{{ project_name | default('app', true) }}"
+    )
+{% elif db_type == 'mysql' %}
+    # MySQL connection
+    # ⚠ PRODUCTION: Set the DATABASE_URL environment variable with your real credentials.
+    #   Example: DATABASE_URL=mysql+pymysql://user:password@host:3306/dbname
+    app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
+        "DATABASE_URL",
+        "mysql+pymysql://root:root@localhost:3306/{{ project_name | default('app', true) }}"
+    )
+{% else %}
+    # SQLite (default) — file lives alongside the backend package
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    db_path = os.path.join(BASE_DIR, "app.db")
+    app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "connect_args": {"check_same_thread": False}
+    }
+{% endif %}
+    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+    db.init_app(app)
+    migrate.init_app(app, db)

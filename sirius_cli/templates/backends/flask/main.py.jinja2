@@ -1,0 +1,277 @@
+import io
+import json
+import base64
+from flask import Flask, jsonify, request, Response, stream_with_context, abort
+from flask_cors import CORS
+from sqlalchemy import or_, and_, cast, String as SAString, desc as sa_desc, asc as sa_asc
+from sqlalchemy.exc import IntegrityError
+
+from .database import db, migrate, init_db
+from . import models, schemas
+{% if auth %}
+from .auth import auth_bp, init_auth, seed_admin_user, get_current_user
+{% endif %}
+
+
+def create_app() -> Flask:
+    """Application factory for the Flask backend."""
+    flask_app = Flask(__name__)
+
+    # Database initialisation (SQLAlchemy + Flask-Migrate)
+    init_db(flask_app)
+
+{% if auth %}
+    # JWT authentication setup
+    init_auth(flask_app)
+{% endif %}
+
+    # CORS — restrict to the frontend dev server and the configured API URL.
+    # ⚠ Add your production domain here when deploying.
+    CORS(
+        flask_app,
+        resources={r"/api/*": {"origins": [
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "{{ api_url }}",
+        ]}},
+        supports_credentials=True,
+    )
+
+    # Register blueprints
+{% if auth %}
+    flask_app.register_blueprint(auth_bp)
+{% endif %}
+
+    # ── Error handlers ────────────────────────────────────────────────────────
+
+    @flask_app.errorhandler(IntegrityError)
+    def integrity_error_handler(exc):
+        return jsonify({"detail": f"Database integrity error: {str(exc.orig)}"}), 400
+
+    # ── Root & metadata routes ────────────────────────────────────────────────
+
+    @flask_app.get("/")
+    def read_root():
+        return jsonify({"message": "Welcome to the generated Sirius-CLI Flask API!"})
+
+    @flask_app.get("/api/metadata")
+    def get_metadata():
+{% if auth %}
+        get_current_user()
+{% endif %}
+        meta = []
+        {% for table_name, columns in schemas.items() %}
+        {% set model_name = table_name.replace('_', ' ').title().replace(' ', '') + "Model" %}
+        meta.append({
+            "name": "{{ table_name }}",
+            "count": db.session.query(models.{{ model_name }}).count(),
+            "columns": json.loads("""{{ columns | tojson }}"""),
+        })
+        {% endfor %}
+        return jsonify(meta)
+
+    # ── Per-table CRUD routes ─────────────────────────────────────────────────
+
+    {% for table_name, columns in schemas.items() %}
+    {% set model_name = table_name.replace('_', ' ').title().replace(' ', '') + "Model" %}
+    {% set schema_response = table_name.replace('_', ' ').title().replace(' ', '') + "Response" %}
+    {% set schema_create = table_name.replace('_', ' ').title().replace(' ', '') + "Create" %}
+    {% set schema_update = table_name.replace('_', ' ').title().replace(' ', '') + "Update" %}
+
+    # Allowlist of valid column names for sorting — prevents attribute probing
+    _{{ table_name }}_sortable_columns = {{ '[' }}"{{ columns | map(attribute='name') | join('", "') }}"{{ ']' }}
+
+    @flask_app.get("/api/{{ table_name }}")
+    def list_{{ table_name }}():
+{% if auth %}
+        get_current_user()
+{% endif %}
+        limit = request.args.get("limit", 100, type=int)
+        cursor = request.args.get("cursor", None)
+        search = request.args.get("search", None)
+        order_by = request.args.get("order_by", None)
+        direction = request.args.get("dir", "asc")
+
+        query = db.session.query(models.{{ model_name }})
+
+        # Server-side search across all string-castable columns
+        if search:
+            search_term = f"%{search}%"
+            search_filters = []
+            for col in models.{{ model_name }}.__table__.columns:
+                search_filters.append(cast(col, SAString).ilike(search_term))
+            if search_filters:
+                query = query.filter(or_(*search_filters))
+
+        # Cursor-based pagination (O(log n))
+        if cursor:
+            try:
+                cursor_data = json.loads(base64.b64decode(cursor).decode("utf-8"))
+                cursor_id = cursor_data.get("id")
+                cursor_val = cursor_data.get("val")
+
+                if order_by and order_by in _{{ table_name }}_sortable_columns and order_by != "id":
+                    col_attr = getattr(models.{{ model_name }}, order_by)
+                    if direction == "desc":
+                        query = query.filter(
+                            or_(
+                                col_attr < cursor_val,
+                                and_(col_attr == cursor_val, models.{{ model_name }}.id < cursor_id),
+                            )
+                        )
+                    else:
+                        query = query.filter(
+                            or_(
+                                col_attr > cursor_val,
+                                and_(col_attr == cursor_val, models.{{ model_name }}.id > cursor_id),
+                            )
+                        )
+                else:
+                    if direction == "desc":
+                        query = query.filter(models.{{ model_name }}.id < cursor_id)
+                    else:
+                        query = query.filter(models.{{ model_name }}.id > cursor_id)
+            except Exception:
+                pass  # Invalid cursor — ignore
+
+        # Column sorting validated against allowlist
+        if order_by and order_by in _{{ table_name }}_sortable_columns:
+            col_attr = getattr(models.{{ model_name }}, order_by, None)
+            if col_attr is not None:
+                if direction == "desc":
+                    query = query.order_by(sa_desc(col_attr), sa_desc(models.{{ model_name }}.id))
+                else:
+                    query = query.order_by(sa_asc(col_attr), sa_asc(models.{{ model_name }}.id))
+        else:
+            if direction == "desc":
+                query = query.order_by(sa_desc(models.{{ model_name }}.id))
+            else:
+                query = query.order_by(sa_asc(models.{{ model_name }}.id))
+
+        records = query.limit(limit).all()
+        schema = schemas.{{ schema_response }}
+        return jsonify([schema.model_validate(r).model_dump() for r in records])
+
+    @flask_app.get("/api/{{ table_name }}/export")
+    def export_{{ table_name }}():
+{% if auth %}
+        get_current_user()
+{% endif %}
+        fmt = request.args.get("fmt", "csv")
+        records = db.session.query(models.{{ model_name }}).all()
+        col_names = [c.name for c in models.{{ model_name }}.__table__.columns]
+
+        if fmt == "xlsx":
+            try:
+                from openpyxl import Workbook
+            except ImportError:
+                return jsonify({"detail": "openpyxl is not installed on the server"}), 500
+
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "{{ table_name }}"
+            ws.append(col_names)
+            for record in records:
+                row = [getattr(record, col) if getattr(record, col) is not None else "" for col in col_names]
+                ws.append(row)
+
+            buf = io.BytesIO()
+            wb.save(buf)
+            buf.seek(0)
+
+            return Response(
+                buf.read(),
+                mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                headers={"Content-Disposition": "attachment; filename={{ table_name }}.xlsx"},
+            )
+
+        # Default: streaming CSV export
+        def generate_csv():
+            yield ",".join(col_names) + "\n"
+            for record in records:
+                row_values = []
+                for col in col_names:
+                    val = getattr(record, col)
+                    if val is None:
+                        row_values.append("")
+                    elif isinstance(val, bool):
+                        row_values.append(str(val))
+                    else:
+                        val_str = str(val).replace('"', '""')
+                        if "," in val_str or "\n" in val_str or '"' in val_str:
+                            row_values.append(f'"{val_str}"')
+                        else:
+                            row_values.append(val_str)
+                yield ",".join(row_values) + "\n"
+
+        return Response(
+            stream_with_context(generate_csv()),
+            mimetype="text/csv",
+            headers={"Content-Disposition": "attachment; filename={{ table_name }}.csv"},
+        )
+
+    @flask_app.get("/api/{{ table_name }}/<int:record_id>")
+    def get_{{ table_name }}(record_id: int):
+{% if auth %}
+        get_current_user()
+{% endif %}
+        record = db.session.get(models.{{ model_name }}, record_id)
+        if not record:
+            return jsonify({"detail": "Record not found in {{ table_name }}"}), 404
+        return jsonify(schemas.{{ schema_response }}.model_validate(record).model_dump())
+
+    @flask_app.post("/api/{{ table_name }}")
+    def create_{{ table_name }}():
+{% if auth %}
+        get_current_user()
+{% endif %}
+        payload = schemas.{{ schema_create }}.model_validate(request.get_json(force=True) or {})
+        db_record = models.{{ model_name }}(**payload.model_dump())
+        db.session.add(db_record)
+        db.session.commit()
+        db.session.refresh(db_record)
+        return jsonify(schemas.{{ schema_response }}.model_validate(db_record).model_dump()), 201
+
+    @flask_app.put("/api/{{ table_name }}/<int:record_id>")
+    def update_{{ table_name }}(record_id: int):
+{% if auth %}
+        get_current_user()
+{% endif %}
+        db_record = db.session.get(models.{{ model_name }}, record_id)
+        if not db_record:
+            return jsonify({"detail": "Record not found in {{ table_name }}"}), 404
+
+        payload = schemas.{{ schema_update }}.model_validate(request.get_json(force=True) or {})
+        for key, value in payload.model_dump(exclude_unset=True).items():
+            setattr(db_record, key, value)
+
+        db.session.commit()
+        db.session.refresh(db_record)
+        return jsonify(schemas.{{ schema_response }}.model_validate(db_record).model_dump())
+
+    @flask_app.delete("/api/{{ table_name }}/<int:record_id>")
+    def delete_{{ table_name }}(record_id: int):
+{% if auth %}
+        get_current_user()
+{% endif %}
+        db_record = db.session.get(models.{{ model_name }}, record_id)
+        if not db_record:
+            return jsonify({"detail": "Record not found in {{ table_name }}"}), 404
+
+        db.session.delete(db_record)
+        db.session.commit()
+        return "", 204
+
+    {% endfor %}
+
+    # ── Post-creation setup ───────────────────────────────────────────────────
+    with flask_app.app_context():
+        db.create_all()
+{% if auth %}
+        seed_admin_user()
+{% endif %}
+
+    return flask_app
+
+
+app = create_app()

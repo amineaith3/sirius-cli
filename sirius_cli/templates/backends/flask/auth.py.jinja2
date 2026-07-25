@@ -1,0 +1,90 @@
+import os
+import secrets
+from datetime import timedelta, timezone, datetime
+from typing import Optional
+from flask import Blueprint, jsonify, request
+from flask_jwt_extended import (
+    JWTManager,
+    create_access_token,
+    jwt_required,
+    get_jwt_identity,
+)
+from passlib.context import CryptContext
+from pydantic import BaseModel
+from .database import db
+from .models import AppUser
+
+# WARNING: Set the SECRET_KEY environment variable in production.
+# If not set, a random key is generated at startup (tokens invalidate on restart).
+_generated_key = secrets.token_hex(32)
+
+
+def init_auth(app):
+    """Configure Flask-JWT-Extended on the app."""
+    app.config["JWT_SECRET_KEY"] = os.environ.get("SECRET_KEY", _generated_key)
+    app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(days=7)
+
+    if "SECRET_KEY" not in os.environ:
+        import sys
+        print(
+            "\n[!] WARNING: SECRET_KEY environment variable is not set.\n"
+            "   Using an auto-generated key. All JWT tokens will be invalidated on server restart.\n"
+            "   Set SECRET_KEY in your .env or environment for production use.\n",
+            file=sys.stderr,
+        )
+
+    JWTManager(app)
+
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+auth_bp = Blueprint("auth", __name__, url_prefix="/api/auth")
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
+
+def get_password_hash(password: str) -> str:
+    return pwd_context.hash(password)
+
+
+@auth_bp.post("/token")
+def login_for_access_token():
+    """Exchange username + password for a JWT access token."""
+    data = request.get_json(force=True) or {}
+    username = data.get("username", "")
+    password = data.get("password", "")
+
+    user = AppUser.query.filter_by(username=username).first()
+    if not user or not verify_password(password, user.hashed_password):
+        return jsonify({"detail": "Incorrect username or password"}), 401
+
+    access_token = create_access_token(identity=username)
+    return jsonify({"access_token": access_token, "token_type": "bearer"}), 200
+
+
+def get_current_user():
+    """Dependency-style helper: returns the AppUser for the current JWT identity."""
+    from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity
+
+    verify_jwt_in_request()
+    identity = get_jwt_identity()
+    user = AppUser.query.filter_by(username=identity).first()
+    if user is None:
+        from flask import abort
+        abort(401)
+    return user
+
+
+def seed_admin_user():
+    """Seed the default admin user if the app_users table is empty."""
+    admin_user = "{{ admin_user }}"
+    admin_pass = "{{ admin_pass }}"
+    if not AppUser.query.first():
+        db_user = AppUser(
+            username=admin_user,
+            hashed_password=get_password_hash(admin_pass),
+        )
+        db.session.add(db_user)
+        db.session.commit()

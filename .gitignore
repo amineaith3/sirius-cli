@@ -59,6 +59,8 @@ PLAN.md
 # AI Artifacts
 .gemini/
 GEMINI.md
+AGENTS.md
+CLAUDE.md
 
 # Python Coverage
 .coverage

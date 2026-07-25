@@ -1,0 +1,38 @@
+from .database import db
+
+
+{% for table_name, columns in schemas.items() %}
+{% set class_name = table_name.replace('_', ' ').title().replace(' ', '') + "Model" %}
+class {{ class_name }}(db.Model):
+    __tablename__ = "{{ table_name }}"
+
+    {% for col in columns %}
+    {% if col.is_pk %}
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    {% elif col.foreign_key %}
+    {{ col.name }} = db.Column(db.{{ col.type }}, db.ForeignKey('{{ col.foreign_key }}'), nullable=True)
+    {% else %}
+    {{ col.name }} = db.Column(db.{{ col.type }}, nullable=True)
+    {% endif %}
+    {% endfor %}
+
+    # Relationships
+    {% for col in columns %}
+    {% if col.foreign_key %}
+    {% set ref_table = col.foreign_key.split('.')[0] %}
+    {% set ref_class = ref_table.replace('_', ' ').title().replace(' ', '') + "Model" %}
+    {% set prop_name = col.name[:-3] if col.name.endswith('_id') else ref_table %}
+    {{ prop_name }} = db.relationship("{{ ref_class }}")
+    {% endif %}
+    {% endfor %}
+
+{% endfor %}
+
+{% if auth %}
+class AppUser(db.Model):
+    __tablename__ = "app_users"
+
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(150), unique=True, index=True, nullable=False)
+    hashed_password = db.Column(db.String(255), nullable=False)
+{% endif %}

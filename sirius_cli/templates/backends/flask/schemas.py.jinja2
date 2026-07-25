@@ -1,0 +1,80 @@
+from pydantic import BaseModel, ConfigDict, Field
+from typing import Optional
+from datetime import datetime
+
+try:
+    from pydantic import EmailStr
+    _has_email_validator = True
+except ImportError:
+    _has_email_validator = False
+    EmailStr = str  # graceful fallback if email-validator not installed
+
+{% for table_name, columns in schemas.items() %}
+{% set class_name = table_name.replace('_', ' ').title().replace(' ', '') %}
+class {{ class_name }}Base(BaseModel):
+    {% for col in columns %}
+    {% if not col.is_pk %}
+    {% if col.type == 'Integer' %}
+    {% if col.name in ['amount', 'price', 'quantity', 'count', 'total', 'balance', 'score', 'rating', 'age', 'year'] or col.name.endswith(('_amount', '_price', '_qty', '_count', '_total', '_score')) %}
+    {{ col.name }}: Optional[int] = Field(default=None, ge=0)
+    {% else %}
+    {{ col.name }}: Optional[int] = None
+    {% endif %}
+    {% elif col.type == 'Float' %}
+    {% if col.name in ['amount', 'price', 'quantity', 'total', 'balance', 'score', 'rating', 'weight', 'cost'] or col.name.endswith(('_amount', '_price', '_qty', '_total', '_score', '_cost')) %}
+    {{ col.name }}: Optional[float] = Field(default=None, ge=0)
+    {% else %}
+    {{ col.name }}: Optional[float] = None
+    {% endif %}
+    {% elif col.type == 'Boolean' %}
+    {{ col.name }}: Optional[bool] = None
+    {% elif col.type == 'DateTime' %}
+    {{ col.name }}: Optional[datetime] = None
+    {% else %}
+    {% if 'email' in col.name %}
+    {{ col.name }}: Optional[EmailStr] = None
+    {% else %}
+    {{ col.name }}: Optional[str] = None
+    {% endif %}
+    {% endif %}
+    {% endif %}
+    {% endfor %}
+
+class {{ class_name }}Create({{ class_name }}Base):
+    pass
+
+class {{ class_name }}Update(BaseModel):
+    {% for col in columns %}
+    {% if not col.is_pk %}
+    {% if col.type == 'Integer' %}
+    {% if col.name in ['amount', 'price', 'quantity', 'count', 'total', 'balance', 'score', 'rating', 'age', 'year'] or col.name.endswith(('_amount', '_price', '_qty', '_count', '_total', '_score')) %}
+    {{ col.name }}: Optional[int] = Field(default=None, ge=0)
+    {% else %}
+    {{ col.name }}: Optional[int] = None
+    {% endif %}
+    {% elif col.type == 'Float' %}
+    {% if col.name in ['amount', 'price', 'quantity', 'total', 'balance', 'score', 'rating', 'weight', 'cost'] or col.name.endswith(('_amount', '_price', '_qty', '_total', '_score', '_cost')) %}
+    {{ col.name }}: Optional[float] = Field(default=None, ge=0)
+    {% else %}
+    {{ col.name }}: Optional[float] = None
+    {% endif %}
+    {% elif col.type == 'Boolean' %}
+    {{ col.name }}: Optional[bool] = None
+    {% elif col.type == 'DateTime' %}
+    {{ col.name }}: Optional[datetime] = None
+    {% else %}
+    {% if 'email' in col.name %}
+    {{ col.name }}: Optional[EmailStr] = None
+    {% else %}
+    {{ col.name }}: Optional[str] = None
+    {% endif %}
+    {% endif %}
+    {% endif %}
+    {% endfor %}
+
+class {{ class_name }}Response({{ class_name }}Base):
+    id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+{% endfor %}
