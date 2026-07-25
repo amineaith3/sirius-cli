@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [0.4.2] — 2026-07-25
+
+### Added
+- Implemented `FlaskBackendStrategy` in `sirius_cli/backends/flask.py`, enabling full Flask backend generation via `--backend=flask`.
+- Added 7 Flask-specific Jinja2 templates under `sirius_cli/templates/backends/flask/`: `main.py`, `database.py`, `models.py`, `schemas.py`, `auth.py`, `requirements.txt`, `Dockerfile`.
+- Flask `main.py` uses the application factory pattern with per-table CRUD routes, cursor-based pagination (O(log n)), server-side search and sort, and CSV/XLSX export endpoints.
+- Flask `database.py` uses Flask-SQLAlchemy and Flask-Migrate with support for SQLite, PostgreSQL, and MySQL targets.
+- Flask `auth.py` provides a Flask-JWT-Extended blueprint with a login endpoint, JWT guard helper, and admin user seeding — activated via `--auth`.
+- Flask `Dockerfile` uses `gunicorn` as the production WSGI server.
+- Registered `FlaskBackendStrategy` in the `BACKEND_STRATEGIES` registry.
+- Unblocked `--backend=flask` in the CLI (`django` guard retained for a future release).
+- Added `*.jinja2 text eol=lf` to `.gitattributes` to enforce consistent line endings for templates.
+- Added 7 tests in `tests/test_flask_backend.py` covering all Flask-specific flags and generated file content.
+- Opened Issue #20 to track future PG/MySQL `seed_data` support (currently SQLite-only, mirroring FastAPI behavior).
+
+---
+
 ## [0.4.1] — 2026-07-22
 
 ### Added

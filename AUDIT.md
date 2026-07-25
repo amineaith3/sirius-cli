@@ -1,8 +1,8 @@
-# Sirius-CLI — Full Audit (v0.4.1)
+# Sirius-CLI — Full Audit (v0.4.2)
 
 ## What It Is
 
-A single CLI command that transforms raw data files (CSV, Excel, SQLite, or JSON) into a fully-containerized, production-ready full-stack application — FastAPI backend, React 18 frontend, Alembic migrations, and Docker Compose. No configuration required. One command, running stack.
+A single CLI command that transforms raw data files (CSV, Excel, SQLite, or JSON) into a fully-containerized, production-ready full-stack application — FastAPI or Flask backend, React 18 frontend, database migrations, and Docker Compose. No configuration required. One command, running stack.
 
 ---
 
@@ -69,7 +69,7 @@ The `update` command regenerates backend and frontend for new tables/columns add
 
 ---
 
-## Current State (v0.4.1)
+## Current State (v0.4.2)
 
 | Feature                                                               | Status                                              |
 | --------------------------------------------------------------------- | --------------------------------------------------- |
@@ -99,7 +99,8 @@ The `update` command regenerates backend and frontend for new tables/columns add
 | Live Dashboard Charts (Real API Data & Trend Visualization)           | ✅ Added in v0.3.7                                  |
 | JSON Input Full Parity & Validation Heuristics                        | ✅ Added in v0.3.8                                  |
 | README & Documentation Refresh (v0.3.x capabilities & architecture)   | ✅ Refreshed in v0.3.9                              |
-| Pluggable Backend Strategies (`--backend`)                          | ✅ Added in v0.4.1                                  |
+| Pluggable Backend Strategies (`--backend`)                          | Added in v0.4.1                                     |
+| Flask Backend Support (`--backend=flask`)                           | Added in v0.4.2                                     |
 
 ---
 
@@ -125,7 +126,7 @@ Prioritized by value-to-effort ratio:
 
 | # | Feature                                               | Why                                                                                  |
 | - | ----------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| 5 | **`--backend=flask\|django\|fastapi` selector** | Unlocks the Django and Flask developer markets.                                      |
+| 5 | **`--backend=flask\|django\|fastapi` selector** | ~~Unlocks the Django and Flask developer markets.~~ **Flask done in v0.4.2. Django pending.**   |
 | 6 | **`--frontend=react\|vue\|svelte` selector**    | Combined with backend selectors = 9 unique stack combinations from a single command. |
 | 7 | **`--from-url` flag**                         | ~~Accept a public CSV URL and fetch + parse on the fly.~~ **Done in v0.3.4**  |
 
