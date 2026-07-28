@@ -13,11 +13,13 @@ from sirius_cli.backends.base import BackendStrategy
 _VALID_SQL_IDENT = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
 
-def _quote_ident(name: str) -> str:
-    """Double-quote a SQL identifier after validating it contains only safe characters.
+def _quote_ident(name: str, db_type: str = "sqlite") -> str:
+    """Quote a SQL identifier after validating it contains only safe characters.
     This prevents SQL injection through table or column names."""
     if not _VALID_SQL_IDENT.match(name):
         raise ValueError(f"Invalid SQL identifier: {name!r}")
+    if db_type == "mysql":
+        return f"`{name}`"
     return f'"{name}"'
 
 
@@ -39,6 +41,42 @@ def _run_alembic(args: list, cwd: str, env: Optional[dict] = None):
     else:
         cmd = [sys.executable, "-m", "alembic"] + args
     subprocess.run(cmd, cwd=cwd, check=True, env=env, stdout=subprocess.DEVNULL)
+
+
+def _get_existing_columns(cursor, table_name: str, db_type: str) -> set:
+    if db_type == "sqlite":
+        quoted = _quote_ident(table_name, db_type)
+        cursor.execute(f"PRAGMA table_info({quoted});")
+        return {info[1] for info in cursor.fetchall()}
+    elif db_type == "pg":
+        cursor.execute(
+            "SELECT column_name FROM information_schema.columns WHERE table_name = %s;",
+            (table_name,),
+        )
+        return {row[0] for row in cursor.fetchall()}
+    elif db_type == "mysql":
+        cursor.execute(
+            "SELECT column_name FROM information_schema.columns WHERE table_name = %s AND table_schema = DATABASE();",
+            (table_name,),
+        )
+        return {row[0] for row in cursor.fetchall()}
+    return set()
+
+
+def _build_insert_query(table_name: str, valid_cols: List[str], db_type: str) -> str:
+    quoted_table = _quote_ident(table_name, db_type)
+    quoted_cols = ", ".join([_quote_ident(c, db_type) for c in valid_cols])
+    if db_type == "sqlite":
+        placeholders = ", ".join(["?"] * len(valid_cols))
+        return f"INSERT OR IGNORE INTO {quoted_table} ({quoted_cols}) VALUES ({placeholders});"
+    elif db_type == "mysql":
+        placeholders = ", ".join(["%s"] * len(valid_cols))
+        return f"INSERT IGNORE INTO {quoted_table} ({quoted_cols}) VALUES ({placeholders});"
+    elif db_type == "pg":
+        placeholders = ", ".join(["%s"] * len(valid_cols))
+        return f"INSERT INTO {quoted_table} ({quoted_cols}) VALUES ({placeholders}) ON CONFLICT DO NOTHING;"
+    else:
+        raise ValueError(f"Unsupported db_type: {db_type}")
 
 
 class FastAPIBackendStrategy(BackendStrategy):
@@ -184,13 +222,109 @@ class FastAPIBackendStrategy(BackendStrategy):
                 "You can configure database credentials and run migrations manually later."
             )
 
-    def seed_data(self, project_path: str, seed_files: List[str]) -> None:
-        db_path = os.path.join(project_path, "backend", "app.db")
-        if not os.path.exists(db_path):
-            return
+    def seed_data(
+        self,
+        project_path: str,
+        seed_files: List[str],
+        db_type: str = "sqlite",
+        db_url: Optional[str] = None,
+    ) -> None:
+        conn = None
+        if db_type == "sqlite":
+            db_path = os.path.join(project_path, "backend", "app.db")
+            if not os.path.exists(db_path):
+                return
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+        elif db_type == "pg":
+            try:
+                import psycopg2
+            except ImportError:
+                typer.secho(
+                    "[WARNING] psycopg2 is not installed. Skipping PostgreSQL seeding.",
+                    fg=typer.colors.YELLOW,
+                )
+                typer.echo("You can install psycopg2 and run seeds manually later.")
+                return
 
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
+            url = db_url or os.environ.get("DATABASE_URL")
+            if not url:
+                typer.secho(
+                    "[WARNING] DATABASE_URL env var is not set. Skipping PostgreSQL seeding.",
+                    fg=typer.colors.YELLOW,
+                )
+                typer.echo("Please configure DATABASE_URL and run seeds manually.")
+                return
+
+            try:
+                normalized_url = url
+                if normalized_url.startswith("postgresql+psycopg2://"):
+                    normalized_url = normalized_url.replace(
+                        "postgresql+psycopg2://", "postgresql://"
+                    )
+                conn = psycopg2.connect(normalized_url)
+                cursor = conn.cursor()
+            except Exception as e:
+                typer.secho(
+                    f"[WARNING] Could not connect to PostgreSQL database: {e}",
+                    fg=typer.colors.YELLOW,
+                )
+                typer.echo(
+                    "Please configure your database credentials and run seeds manually."
+                )
+                return
+        elif db_type == "mysql":
+            try:
+                import pymysql
+            except ImportError:
+                typer.secho(
+                    "[WARNING] pymysql is not installed. Skipping MySQL seeding.",
+                    fg=typer.colors.YELLOW,
+                )
+                typer.echo("You can install pymysql and run seeds manually later.")
+                return
+
+            url = db_url or os.environ.get("DATABASE_URL")
+            if not url:
+                typer.secho(
+                    "[WARNING] DATABASE_URL env var is not set. Skipping MySQL seeding.",
+                    fg=typer.colors.YELLOW,
+                )
+                typer.echo("Please configure DATABASE_URL and run seeds manually.")
+                return
+
+            try:
+                from urllib.parse import urlparse, unquote
+
+                normalized_url = url
+                if normalized_url.startswith("mysql+pymysql://"):
+                    normalized_url = normalized_url.replace(
+                        "mysql+pymysql://", "mysql://"
+                    )
+                parsed = urlparse(normalized_url)
+                username = unquote(parsed.username) if parsed.username else ""
+                password = unquote(parsed.password) if parsed.password else ""
+                database = parsed.path.lstrip("/")
+                conn = pymysql.connect(
+                    host=parsed.hostname or "localhost",
+                    port=parsed.port or 3306,
+                    user=username,
+                    password=password,
+                    database=database,
+                    autocommit=True,
+                )
+                cursor = conn.cursor()
+            except Exception as e:
+                typer.secho(
+                    f"[WARNING] Could not connect to MySQL database: {e}",
+                    fg=typer.colors.YELLOW,
+                )
+                typer.echo(
+                    "Please configure your database credentials and run seeds manually."
+                )
+                return
+        else:
+            return
 
         for path in seed_files:
             if not os.path.exists(path):
@@ -241,17 +375,14 @@ class FastAPIBackendStrategy(BackendStrategy):
                                     mapped_json_row[sanitized_k] = v
                             rows.append(mapped_json_row)
 
-                        quoted_table = _quote_ident(san_table)
-                        cursor.execute(f"PRAGMA table_info({quoted_table});")
-                        existing_cols = {info[1] for info in cursor.fetchall()}
-
+                        existing_cols = _get_existing_columns(
+                            cursor, san_table, db_type
+                        )
                         valid_cols = [c for c in san_cols if c in existing_cols]
                         if not valid_cols:
                             continue
 
-                        placeholders = ", ".join(["?"] * len(valid_cols))
-                        quoted_cols = ", ".join([_quote_ident(c) for c in valid_cols])
-                        query = f"INSERT OR IGNORE INTO {quoted_table} ({quoted_cols}) VALUES ({placeholders});"
+                        query = _build_insert_query(san_table, valid_cols, db_type)
 
                         data_to_insert = []
                         for row in rows:
@@ -303,17 +434,12 @@ class FastAPIBackendStrategy(BackendStrategy):
             if not rows:
                 continue
 
-            quoted_table = _quote_ident(table_name)
-            cursor.execute(f"PRAGMA table_info({quoted_table});")
-            existing_cols = {info[1] for info in cursor.fetchall()}
-
+            existing_cols = _get_existing_columns(cursor, table_name, db_type)
             valid_cols = [c for c in cols if c in existing_cols]
             if not valid_cols:
                 continue
 
-            placeholders = ", ".join(["?"] * len(valid_cols))
-            quoted_cols = ", ".join([_quote_ident(c) for c in valid_cols])
-            query = f"INSERT OR IGNORE INTO {quoted_table} ({quoted_cols}) VALUES ({placeholders});"
+            query = _build_insert_query(table_name, valid_cols, db_type)
 
             data_to_insert = []
             for row in rows:
@@ -322,5 +448,6 @@ class FastAPIBackendStrategy(BackendStrategy):
 
             cursor.executemany(query, data_to_insert)
 
-        conn.commit()
-        conn.close()
+        if conn:
+            conn.commit()
+            conn.close()

@@ -197,3 +197,118 @@ def test_seed_database_from_csvs(tmp_path):
     assert roles[1] == (11, "user")
 
     conn.close()
+
+
+def test_seed_database_pg_mysql_mocked(tmp_path):
+    from unittest.mock import MagicMock, patch
+    from sirius_cli.backends.fastapi import FastAPIBackendStrategy
+    from sirius_cli.backends.flask import FlaskBackendStrategy
+    import sys
+
+    # Create dummy seed files
+    csv_file = tmp_path / "users.csv"
+    csv_file.write_text("id,name\n1,Alice\n", encoding="utf-8")
+    seed_paths = [str(csv_file)]
+
+    # Mock psycopg2
+    mock_psycopg2 = MagicMock()
+    mock_conn_pg = MagicMock()
+    mock_cursor_pg = MagicMock()
+    mock_psycopg2.connect.return_value = mock_conn_pg
+    mock_conn_pg.cursor.return_value = mock_cursor_pg
+    # Mock information schema return
+    mock_cursor_pg.fetchall.return_value = [("id",), ("name",)]
+
+    # Mock pymysql
+    mock_pymysql = MagicMock()
+    mock_conn_mysql = MagicMock()
+    mock_cursor_mysql = MagicMock()
+    mock_pymysql.connect.return_value = mock_conn_mysql
+    mock_conn_mysql.cursor.return_value = mock_cursor_mysql
+    # Mock information schema return
+    mock_cursor_mysql.fetchall.return_value = [("id",), ("name",)]
+
+    # Test PG Seeding with missing psycopg2
+    with patch.dict(sys.modules, {"psycopg2": None}):
+        strategy = FastAPIBackendStrategy()
+        strategy.seed_data(
+            str(tmp_path), seed_paths, db_type="pg", db_url="postgresql://localhost/db"
+        )
+
+    # Test PG Seeding with psycopg2 present (FastAPI)
+    with patch.dict(sys.modules, {"psycopg2": mock_psycopg2}):
+        strategy = FastAPIBackendStrategy()
+        strategy.seed_data(
+            str(tmp_path), seed_paths, db_type="pg", db_url="postgresql://localhost/db"
+        )
+        mock_psycopg2.connect.assert_called_once_with("postgresql://localhost/db")
+        mock_cursor_pg.execute.assert_any_call(
+            "SELECT column_name FROM information_schema.columns WHERE table_name = %s;",
+            ("users",),
+        )
+        mock_cursor_pg.executemany.assert_called_once_with(
+            'INSERT INTO "users" ("id", "name") VALUES (%s, %s) ON CONFLICT DO NOTHING;',
+            [("1", "Alice")],
+        )
+
+    # Test PG Seeding with psycopg2 present (Flask)
+    mock_psycopg2.reset_mock()
+    mock_cursor_pg.reset_mock()
+    with patch.dict(sys.modules, {"psycopg2": mock_psycopg2}):
+        strategy = FlaskBackendStrategy()
+        strategy.seed_data(
+            str(tmp_path), seed_paths, db_type="pg", db_url="postgresql://localhost/db"
+        )
+        mock_cursor_pg.executemany.assert_called_once_with(
+            'INSERT INTO "users" ("id", "name") VALUES (%s, %s) ON CONFLICT DO NOTHING;',
+            [("1", "Alice")],
+        )
+
+    # Test MySQL Seeding with missing pymysql
+    with patch.dict(sys.modules, {"pymysql": None}):
+        strategy = FastAPIBackendStrategy()
+        strategy.seed_data(
+            str(tmp_path), seed_paths, db_type="mysql", db_url="mysql://localhost/db"
+        )
+
+    # Test MySQL Seeding with pymysql present (FastAPI)
+    with patch.dict(sys.modules, {"pymysql": mock_pymysql}):
+        strategy = FastAPIBackendStrategy()
+        strategy.seed_data(
+            str(tmp_path),
+            seed_paths,
+            db_type="mysql",
+            db_url="mysql+pymysql://user:pass@localhost:3306/db",
+        )
+        mock_pymysql.connect.assert_called_once_with(
+            host="localhost",
+            port=3306,
+            user="user",
+            password="pass",
+            database="db",
+            autocommit=True,
+        )
+        mock_cursor_mysql.execute.assert_any_call(
+            "SELECT column_name FROM information_schema.columns WHERE table_name = %s AND table_schema = DATABASE();",
+            ("users",),
+        )
+        mock_cursor_mysql.executemany.assert_called_once_with(
+            "INSERT IGNORE INTO `users` (`id`, `name`) VALUES (%s, %s);",
+            [("1", "Alice")],
+        )
+
+    # Test MySQL Seeding with pymysql present (Flask)
+    mock_pymysql.reset_mock()
+    mock_cursor_mysql.reset_mock()
+    with patch.dict(sys.modules, {"pymysql": mock_pymysql}):
+        strategy = FlaskBackendStrategy()
+        strategy.seed_data(
+            str(tmp_path),
+            seed_paths,
+            db_type="mysql",
+            db_url="mysql+pymysql://user:pass@localhost:3306/db",
+        )
+        mock_cursor_mysql.executemany.assert_called_once_with(
+            "INSERT IGNORE INTO `users` (`id`, `name`) VALUES (%s, %s);",
+            [("1", "Alice")],
+        )
