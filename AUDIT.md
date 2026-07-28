@@ -1,4 +1,4 @@
-# Sirius-CLI — Full Audit (v0.4.2)
+# Sirius-CLI — Full Audit (v0.4.3)
 
 ## What It Is
 
@@ -69,7 +69,7 @@ The `update` command regenerates backend and frontend for new tables/columns add
 
 ---
 
-## Current State (v0.4.2)
+## Current State (v0.4.3)
 
 | Feature                                                               | Status                                              |
 | --------------------------------------------------------------------- | --------------------------------------------------- |
@@ -101,6 +101,7 @@ The `update` command regenerates backend and frontend for new tables/columns add
 | README & Documentation Refresh (v0.3.x capabilities & architecture)   | ✅ Refreshed in v0.3.9                              |
 | Pluggable Backend Strategies (`--backend`)                          | Added in v0.4.1                                     |
 | Flask Backend Support (`--backend=flask`)                           | Added in v0.4.2                                     |
+| PG/MySQL Seed Data Support at Scaffold Time                           | Added in v0.4.3                                     |
 
 ---
 
