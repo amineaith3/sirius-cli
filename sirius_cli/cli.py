@@ -307,19 +307,16 @@ def init(
     # Seed initial data if building from CSVs, Excel, or JSON files
     seed_paths = list(csv or []) + list(excel or []) + list(json or [])
     if seed_paths and not no_seed:
-        if db_type == "sqlite":
-            typer.echo("Seeding initial data from source files...")
-            try:
-                backend_strategy.seed_data(dest_dir, seed_paths)
-                typer.secho("[OK] Database seeded successfully!", fg=typer.colors.GREEN)
-            except Exception as se:
-                typer.secho(
-                    f"[WARNING] Database seeding failed: {se}",
-                    fg=typer.colors.YELLOW,
-                )
-        else:
+        typer.echo(f"Seeding initial data from source files ({db_type})...")
+        try:
+            db_url = os.environ.get("DATABASE_URL")
+            backend_strategy.seed_data(
+                dest_dir, seed_paths, db_type=db_type, db_url=db_url
+            )
+            typer.secho("[OK] Database seeded successfully!", fg=typer.colors.GREEN)
+        except Exception as se:
             typer.secho(
-                "[SKIP] CSV/Excel seeding is only supported for SQLite at scaffold time. Skipping.",
+                f"[WARNING] Database seeding failed: {se}",
                 fg=typer.colors.YELLOW,
             )
     elif no_seed:

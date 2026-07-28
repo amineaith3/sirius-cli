@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 
 
 class BackendStrategy(ABC):
@@ -41,7 +41,13 @@ class BackendStrategy(ABC):
         pass
 
     @abstractmethod
-    def seed_data(self, project_path: str, seed_files: List[str]) -> None:
+    def seed_data(
+        self,
+        project_path: str,
+        seed_files: List[str],
+        db_type: str = "sqlite",
+        db_url: Optional[str] = None,
+    ) -> None:
         """
         Seeds the target database with row data extracted from CSV, Excel, or JSON sources.
         """
