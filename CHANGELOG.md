@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [0.4.3] — 2026-07-28
+
+### Added
+- Implemented PostgreSQL and MySQL seed data support at scaffold time in `FastAPIBackendStrategy` and `FlaskBackendStrategy`.
+- Supported connection credentials parsing and normalization from `DATABASE_URL` parameter/environment variables.
+- Added dynamic check and graceful warning/instructions on Typer CLI for missing `psycopg2` or `pymysql` database drivers.
+- Adapted identifier quoting (backticks for MySQL, double quotes for PostgreSQL) and conflict/duplicate ignoring (`ON CONFLICT DO NOTHING` for PostgreSQL and `INSERT IGNORE` for MySQL).
+- Added comprehensive integration tests mocking database client connections in `tests/test_cli.py`.
+
 ## [0.4.2] — 2026-07-25
 
 ### Added
