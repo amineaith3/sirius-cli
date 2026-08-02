@@ -6,6 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [0.4.4] — 2026-08-02
+
+### Added
+- Implemented `DjangoBackendStrategy` in `sirius_cli/backends/django.py`, enabling full Django backend generation via `--backend=django`.
+- Added 8 Django-specific Jinja2 templates under `sirius_cli/templates/backends/django/`: `settings.py`, `urls.py`, `models.py`, `serializers.py`, `views.py`, `wsgi.py`, `auth.py`, `requirements.txt`, `Dockerfile`, and `manage.py`.
+- Django `models.py` uses Django's built-in ORM (no SQLAlchemy), with full support for Integer, Float, Boolean, DateTime, Text, and FK fields.
+- Django `views.py` uses DRF `ModelViewSet` with cursor-based pagination (O(log n)), server-side search, sort allowlist validation, and CSV/XLSX export endpoints.
+- Django `urls.py` registers all tables via `DefaultRouter` and exposes simplejwt token endpoints when `--auth` is used.
+- Django `settings.py` configures DRF, CORS (`django-cors-headers`), and the database engine (SQLite, PostgreSQL, MySQL) from context variables.
+- Django `auth.py` (activated via `--auth`) seeds the default admin user; JWT auth is provided by `djangorestframework-simplejwt`.
+- Django `Dockerfile` uses `gunicorn` as the production WSGI server, consistent with Flask backend.
+- Django `manage.py` is generated at the project root for running management commands.
+- `post_init_setup` runs `makemigrations backend` + `migrate` at scaffold time.
+- `post_update_setup` runs `makemigrations --name` + `migrate` for the `sirius-update` command.
+- `seed_data` supports SQLite, PostgreSQL, and MySQL (full parity with FastAPI and Flask strategies).
+- Registered `DjangoBackendStrategy` in the `BACKEND_STRATEGIES` registry.
+- Removed the `--backend=django` early-exit guard from the CLI.
+- Added 7 tests in `tests/test_django_backend.py` covering all Django-specific flags and generated file content.
+
 ## [0.4.3] — 2026-07-28
 
 ### Added

@@ -1,0 +1,24 @@
+"""
+Django URL configuration for the generated {{ project_name }} backend.
+"""
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from . import views
+{% if auth %}
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+{% endif %}
+
+
+router = DefaultRouter()
+{% for table_name, columns in schemas.items() %}
+{% set class_name = table_name.replace('_', ' ').title().replace(' ', '') %}
+router.register(r"{{ table_name }}", views.{{ class_name }}ViewSet, basename="{{ table_name }}")
+{% endfor %}
+
+urlpatterns = [
+    path("api/", include(router.urls)),
+{% if auth %}
+    path("api/auth/token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
+    path("api/auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
+{% endif %}
+]

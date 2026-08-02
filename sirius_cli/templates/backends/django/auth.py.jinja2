@@ -1,0 +1,28 @@
+"""
+Auth helpers for the generated {{ project_name }} Django backend.
+Provides a management-command-style seed function for the default admin user.
+JWT token endpoints are registered in urls.py via djangorestframework-simplejwt.
+"""
+import os
+import sys
+
+
+def seed_admin_user():
+    """Seed the default admin user if the AppUser table is empty."""
+    import django
+
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "backend.settings")
+    django.setup()
+
+    from backend.models import AppUser
+
+    admin_user = "{{ admin_user }}"
+    admin_pass = "{{ admin_pass }}"
+
+    if not AppUser.objects.exists():
+        AppUser.objects.create_user(username=admin_user, password=admin_pass)
+
+
+if __name__ == "__main__":
+    seed_admin_user()
+    print("[OK] Admin user seeded.")
