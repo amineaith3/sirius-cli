@@ -1,0 +1,13 @@
+from rest_framework import serializers
+from . import models
+
+
+{% for table_name, columns in schemas.items() %}
+{% set class_name = table_name.replace('_', ' ').title().replace(' ', '') %}
+class {{ class_name }}Serializer(serializers.ModelSerializer):
+    class Meta:
+        model = models.{{ class_name }}
+        fields = "__all__"
+
+
+{% endfor %}

@@ -1,0 +1,139 @@
+import base64
+import json
+from django.db.models import Q
+from rest_framework import viewsets, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+{% if auth %}
+from rest_framework.permissions import IsAuthenticated
+{% else %}
+from rest_framework.permissions import AllowAny
+{% endif %}
+from . import models, serializers
+
+
+{% for table_name, columns in schemas.items() %}
+{% set class_name = table_name.replace('_', ' ').title().replace(' ', '') %}
+# Allowlist of valid column names for sorting — prevents attribute probing
+_{{ table_name }}_sortable_columns = {{ '[' }}"{{ columns | map(attribute='name') | join('", "') }}"{{ ']' }}
+
+
+class {{ class_name }}ViewSet(viewsets.ModelViewSet):
+    serializer_class = serializers.{{ class_name }}Serializer
+{% if auth %}
+    permission_classes = [IsAuthenticated]
+{% else %}
+    permission_classes = [AllowAny]
+{% endif %}
+
+    def get_queryset(self):
+        qs = models.{{ class_name }}.objects.all()
+        search = self.request.query_params.get("search")
+        order_by = self.request.query_params.get("order_by")
+        direction = self.request.query_params.get("dir", "asc")
+        cursor = self.request.query_params.get("cursor")
+        limit = int(self.request.query_params.get("limit", 100))
+
+        # Server-side search across all text fields
+        if search:
+            q_filter = Q()
+            for field in models.{{ class_name }}._meta.get_fields():
+                try:
+                    q_filter |= Q(**{f"{field.name}__icontains": search})
+                except Exception:
+                    pass
+            qs = qs.filter(q_filter)
+
+        # Cursor-based pagination (O(log n))
+        if cursor:
+            try:
+                cursor_data = json.loads(base64.b64decode(cursor).decode("utf-8"))
+                cursor_id = cursor_data.get("id")
+                cursor_val = cursor_data.get("val")
+                if (
+                    order_by
+                    and order_by in _{{ table_name }}_sortable_columns
+                    and order_by != "id"
+                ):
+                    if direction == "desc":
+                        qs = qs.filter(
+                            Q(**{f"{order_by}__lt": cursor_val})
+                            | Q(**{f"{order_by}": cursor_val, "id__lt": cursor_id})
+                        )
+                    else:
+                        qs = qs.filter(
+                            Q(**{f"{order_by}__gt": cursor_val})
+                            | Q(**{f"{order_by}": cursor_val, "id__gt": cursor_id})
+                        )
+                else:
+                    if direction == "desc":
+                        qs = qs.filter(id__lt=cursor_id)
+                    else:
+                        qs = qs.filter(id__gt=cursor_id)
+            except Exception:
+                pass
+
+        # Column sorting validated against allowlist
+        if order_by and order_by in _{{ table_name }}_sortable_columns:
+            prefix = "-" if direction == "desc" else ""
+            qs = qs.order_by(f"{prefix}{order_by}", f"{'' if direction != 'desc' else '-'}id")
+        else:
+            if direction == "desc":
+                qs = qs.order_by("-id")
+            else:
+                qs = qs.order_by("id")
+
+        return qs[:limit]
+
+    @action(detail=False, methods=["get"], url_path="export")
+    def export(self, request):
+        """Stream all records as CSV."""
+        import io
+        import csv as csv_module
+        from django.http import StreamingHttpResponse
+
+        fmt = request.query_params.get("fmt", "csv")
+        qs = models.{{ class_name }}.objects.all()
+        col_names = [f.name for f in models.{{ class_name }}._meta.get_fields() if hasattr(f, "column")]
+
+        if fmt == "xlsx":
+            try:
+                from openpyxl import Workbook
+            except ImportError:
+                return Response({"detail": "openpyxl is not installed"}, status=500)
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "{{ table_name }}"
+            ws.append(col_names)
+            for record in qs:
+                ws.append([getattr(record, c, "") or "" for c in col_names])
+            buf = io.BytesIO()
+            wb.save(buf)
+            buf.seek(0)
+            from django.http import HttpResponse
+            response = HttpResponse(
+                buf.read(),
+                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+            response["Content-Disposition"] = "attachment; filename={{ table_name }}.xlsx"
+            return response
+
+        def stream_csv():
+            buf = io.StringIO()
+            writer = csv_module.writer(buf)
+            writer.writerow(col_names)
+            yield buf.getvalue()
+            buf.truncate(0)
+            buf.seek(0)
+            for record in qs:
+                writer.writerow([getattr(record, c, "") for c in col_names])
+                yield buf.getvalue()
+                buf.truncate(0)
+                buf.seek(0)
+
+        response = StreamingHttpResponse(stream_csv(), content_type="text/csv")
+        response["Content-Disposition"] = "attachment; filename={{ table_name }}.csv"
+        return response
+
+
+{% endfor %}

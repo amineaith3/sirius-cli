@@ -122,14 +122,6 @@ def init(
         )
         raise typer.Exit(code=1)
 
-    if backend == "django":
-        typer.secho(
-            "Error: Backend 'django' is not supported yet. Coming in a future release!",
-            fg=typer.colors.RED,
-            err=True,
-        )
-        raise typer.Exit(code=1)
-
     backend_strategy = get_backend_strategy(backend)
 
     # Ensure one and only one source parameter is provided

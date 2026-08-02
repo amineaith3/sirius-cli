@@ -1,7 +1,7 @@
 # Sirius-CLI
 
 A rapid prototyping CLI tool designed to take multiple CSV files, Excel spreadsheets, a SQLite database, or a JSON configuration file as inputs, automatically infer their structural schemas and relationships, and generate:
-- A production-grade, container-ready **FastAPI** backend (with SQLAlchemy models, Pydantic v2 validation schemas, and automated Alembic migrations).
+- A production-grade, container-ready **FastAPI**, **Flask**, or **Django** backend with full CRUD, migrations, and optional JWT authentication.
 - A modular, responsive, multi-page **React 18 (TypeScript, Vite, Tailwind CSS)** CRUD frontend with dynamic relational selectors and a beautiful Dashboard.
 
 📚 **[Read the Official Technical Documentation Here](https://sirius-cli.sirius-aah.com/)**
@@ -34,7 +34,8 @@ Before using Sirius-CLI, ensure you have the following installed:
 - **Multiple Database Targets**: Scaffold for SQLite by default, or target production-grade PostgreSQL (`--pg`) and MySQL (`--mysql`).
 - **JWT Auth Scaffold (`--auth`)**: Integrated bcrypt password hashing, JWT Bearer authentication routes, protected endpoint dependencies, and a React Login screen.
 - **In-Memory Instant Preview (`sirius-init preview`)**: Spin up an ephemeral backend + frontend preview directly in your browser without creating disk files.
-- **Iterative Updates (`sirius-init update`)**: Safely add new tables or columns to an existing project with automated Alembic migration autogeneration.
+- **Pluggable Backend Engine (`--backend`)**: Choose between **FastAPI** (SQLAlchemy + Alembic), **Flask** (Flask-SQLAlchemy + Flask-Migrate), or **Django** (native ORM + DRF ModelViewSets + simplejwt) via a single flag. All three backends share the same CRUD feature set, migration wiring, and seed data support.
+- **Iterative Updates (`sirius-init update`)**: Safely add new tables or columns to an existing project with automated migration autogeneration.
 
 ---
 
