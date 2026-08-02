@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [0.4.5] — 2026-08-02
+
+### Fixed
+- Fixed GitGuardian secret scanning warnings by removing hardcoded generic database passwords (`postgres` and `root`) from the generated Django database configuration templates, defaulting to empty strings instead.
+
 ## [0.4.4] — 2026-08-02
 
 ### Added

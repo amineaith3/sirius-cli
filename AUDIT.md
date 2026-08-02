@@ -1,4 +1,4 @@
-# Sirius-CLI — Full Audit (v0.4.4)
+# Sirius-CLI — Full Audit (v0.4.5)
 
 ## What It Is
 
