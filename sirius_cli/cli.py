@@ -14,6 +14,7 @@ from sirius_cli.generator import generate_project
 from sirius_cli.preview import run_preview
 from sirius_cli.fetcher import fetch_remote_file
 from sirius_cli.backends import get_backend_strategy
+from sirius_cli.frontends import get_frontend_strategy
 
 app = typer.Typer(
     help="Sirius-CLI: A rapid prototyping backend and frontend code generator."
@@ -112,6 +113,11 @@ def init(
         "--backend",
         help="Backend framework to generate (fastapi, flask, django)",
     ),
+    frontend: str = typer.Option(
+        "react",
+        "--frontend",
+        help="Frontend framework to generate (react)",
+    ),
 ):
     """Initializes a new backend and React frontend stack from data files or configuration."""
     if backend not in ("fastapi", "flask", "django"):
@@ -122,7 +128,16 @@ def init(
         )
         raise typer.Exit(code=1)
 
+    if frontend not in ("react",):
+        typer.secho(
+            f"Error: Unsupported frontend '{frontend}'. Supported options: react.",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
     backend_strategy = get_backend_strategy(backend)
+    frontend_strategy = get_frontend_strategy(frontend)
 
     # Ensure one and only one source parameter is provided
     inputs = [
@@ -270,6 +285,7 @@ def init(
             dest_dir,
             schemas,
             backend_strategy,
+            frontend_strategy=frontend_strategy,
             project_name=project_name,
             theme=resolved_theme,
             port=port,
@@ -393,6 +409,11 @@ def update(
         "--backend",
         help="Backend framework to generate (fastapi, flask, django)",
     ),
+    frontend: str = typer.Option(
+        "react",
+        "--frontend",
+        help="Frontend framework to generate (react)",
+    ),
 ):
     """Updates an existing project with new columns/tables."""
     if backend not in ("fastapi", "flask", "django"):
@@ -411,7 +432,16 @@ def update(
         )
         raise typer.Exit(code=1)
 
+    if frontend not in ("react",):
+        typer.secho(
+            f"Error: Unsupported frontend '{frontend}'. Supported options: react.",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
     backend_strategy = get_backend_strategy(backend)
+    frontend_strategy = get_frontend_strategy(frontend)
 
     if not os.path.exists(project_path):
         typer.secho(
@@ -520,6 +550,7 @@ def update(
             project_path,
             schemas,
             backend_strategy,
+            frontend_strategy=frontend_strategy,
             project_name=project_name,
             theme=theme,
             port=port,
