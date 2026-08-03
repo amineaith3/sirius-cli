@@ -1,6 +1,9 @@
 import os
+from typing import Optional
 from jinja2 import Environment, FileSystemLoader
 from sirius_cli.backends.base import BackendStrategy
+from sirius_cli.frontends.base import FrontendStrategy
+from sirius_cli.frontends.react import ReactFrontendStrategy
 
 TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "templates")
 
@@ -24,6 +27,7 @@ def generate_project(
     project_path: str,
     schemas: dict,
     backend_strategy: BackendStrategy,
+    frontend_strategy: Optional[FrontendStrategy] = None,
     project_name: str = "app",
     theme: str = "blue",
     port: int = 8000,
@@ -33,7 +37,9 @@ def generate_project(
     admin_user: str = "admin",
     admin_pass: str = "admin",
 ):
-    """Generates complete FastAPI and React frontend files structure based on inferred schemas and theme."""
+    """Generates complete backend and frontend files structure based on inferred schemas and theme."""
+    if frontend_strategy is None:
+        frontend_strategy = ReactFrontendStrategy()
     env = get_env()
 
     # Shared template context — all templates receive all variables
@@ -63,49 +69,8 @@ def generate_project(
     # Generate .env.example for production documentation
     _generate_env_example(project_path, db_type, auth, port)
 
-    # 3. Frontend React configurator files
-    frontend_path = os.path.join(project_path, "frontend")
-
-    frontend_templates = {
-        "frontend/index.html.jinja2": "index.html",
-        "frontend/package.json.jinja2": "package.json",
-        "frontend/tsconfig.json.jinja2": "tsconfig.json",
-        "frontend/vite.config.ts.jinja2": "vite.config.ts",
-        "frontend/tailwind.config.js.jinja2": "tailwind.config.js",
-        "frontend/postcss.config.js.jinja2": "postcss.config.js",
-        "frontend/Dockerfile.jinja2": "Dockerfile",
-        "frontend/.env.jinja2": ".env",
-        "frontend/src/main.tsx.jinja2": "src/main.tsx",
-        "frontend/src/index.css.jinja2": "src/index.css",
-        "frontend/src/App.tsx.jinja2": "src/App.tsx",
-        "frontend/src/Dashboard.tsx.jinja2": "src/Dashboard.tsx",
-        "frontend/src/components/SiriusTable.tsx.jinja2": "src/components/SiriusTable.tsx",
-        "frontend/src/components/SiriusPagination.tsx.jinja2": "src/components/SiriusPagination.tsx",
-        "frontend/src/components/SiriusBadge.tsx.jinja2": "src/components/SiriusBadge.tsx",
-        "frontend/src/components/SiriusDropdown.tsx.jinja2": "src/components/SiriusDropdown.tsx",
-        "frontend/src/components/SiriusError.tsx.jinja2": "src/components/SiriusError.tsx",
-    }
-
-    if auth:
-        frontend_templates["frontend/src/Login.tsx.jinja2"] = "src/pages/Login.tsx"
-
-    for t_path, dest_name in frontend_templates.items():
-        render_template(env, t_path, os.path.join(frontend_path, dest_name), **ctx)
-
-    # 4. Generate dynamic CRUD view pages for each table
-    for table_name, columns in schemas.items():
-        pascal_name = table_name.replace("_", " ").title().replace(" ", "")
-        dest_crud_path = os.path.join(
-            frontend_path, "src", "pages", f"{pascal_name}Crud.tsx"
-        )
-        render_template(
-            env,
-            "frontend/src/TableCrud.tsx.jinja2",
-            dest_crud_path,
-            table_name=table_name,
-            columns=columns,
-            **ctx,
-        )
+    # 3. Generate Frontend-specific files using Strategy
+    frontend_strategy.generate_files(project_path, ctx)
 
 
 def _generate_env_example(project_path: str, db_type: str, auth: bool, port: int):
