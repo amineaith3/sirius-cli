@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [0.5.1] — 2026-08-03
+
+### Added
+- Decoupled the React frontend code generation using the **Strategy Pattern**, paving the way for pluggable frontend target frameworks (Vue 3, SvelteKit).
+- Relocated React Jinja2 templates under a new directory: `sirius_cli/templates/frontends/react/`.
+- Introduced a pluggable `FrontendStrategy` abstract base strategy class and strategies registry.
+- Added a `--frontend` CLI flag parameter (defaulting to `react`) to both the `init` and `update` commands.
+- Enabled automatic generation of the previously missing `SiriusToast.tsx` component in React output.
+- Added 4 new automated frontend strategy tests in `tests/test_frontend.py`.
+
 ## [0.4.5] — 2026-08-02
 
 ### Fixed
