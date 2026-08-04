@@ -2,7 +2,7 @@
 
 A rapid prototyping CLI tool designed to take multiple CSV files, Excel spreadsheets, a SQLite database, or a JSON configuration file as inputs, automatically infer their structural schemas and relationships, and generate:
 - A production-grade, container-ready **FastAPI**, **Flask**, or **Django** backend with full CRUD, migrations, and optional JWT authentication.
-- A modular, responsive, multi-page **React 18 (TypeScript, Vite, Tailwind CSS)** CRUD frontend with dynamic relational selectors and a beautiful Dashboard.
+- A modular, responsive, multi-page **React 18** or **Vue 3** (TypeScript, Vite, Tailwind CSS) CRUD frontend with dynamic relational selectors and a beautiful Dashboard.
 
 📚 **[Read the Official Technical Documentation Here](https://sirius-cli.sirius-aah.com/)**
 
@@ -16,7 +16,7 @@ Before using Sirius-CLI, ensure you have the following installed:
 |---|---|---|
 | **Python** | 3.9+ | Runtime for the CLI tool itself |
 | **pip** | Latest | Installing sirius-cli from PyPI |
-| **Node.js** | 16+ | Running the generated React frontend (`npm install`, `npm run dev`) |
+| **Node.js** | 16+ | Running the generated React or Vue frontend (`npm install`, `npm run dev`) |
 | **Docker** *(optional)* | 20+ | Running the full stack via `docker compose up` |
 
 ---
@@ -28,13 +28,14 @@ Before using Sirius-CLI, ensure you have the following installed:
 - **Advanced Heuristic Form Validation**: Infer strict HTML5 inputs (`required`, `min`, `max`, `type="email"`, `type="tel"`, zip pattern validation) and native `<select>` dropdowns for low-cardinality enum columns.
 - **Live Dashboard Charts**: Built-in Recharts analytics components with live date trend visualization (`created_at` grouping) and total row fallbacks.
 - **Enterprise Data Grid & Cursor Pagination**: O(log n) cursor pagination, server-side search (`?search=`), server-side column sorting (`?order_by=`), and dual CSV + Excel exports.
-- **Polished UX & Component Library**: Reusable React components (`SiriusTable`, `SiriusPagination`, `SiriusBadge`, `SiriusDropdown`, `SiriusError`), skeleton loading overlays, non-blocking toast notifications, and 404 deleted parent FK navigation handling.
+- **Polished UX & Component Library**: Reusable React/Vue components (`SiriusTable`, `SiriusPagination`, `SiriusBadge`, `SiriusDropdown`, `SiriusError`), skeleton loading overlays, non-blocking toast notifications, and 404 deleted parent FK navigation handling.
 - **Remote Data Fetching (`--from-url`)**: Fetch public datasets directly from HTTP/HTTPS URLs with local SHA-256 caching and streaming progress.
 - **Relational Navigation & Highlight**: FK badges dynamically resolve human-readable parent record names and smooth-scroll + flash-highlight target records via URL params.
 - **Multiple Database Targets**: Scaffold for SQLite by default, or target production-grade PostgreSQL (`--pg`) and MySQL (`--mysql`).
-- **JWT Auth Scaffold (`--auth`)**: Integrated bcrypt password hashing, JWT Bearer authentication routes, protected endpoint dependencies, and a React Login screen.
+- **JWT Auth Scaffold (`--auth`)**: Integrated bcrypt password hashing, JWT Bearer authentication routes, protected endpoint dependencies, and a React/Vue Login screen.
 - **In-Memory Instant Preview (`sirius-init preview`)**: Spin up an ephemeral backend + frontend preview directly in your browser without creating disk files.
 - **Pluggable Backend Engine (`--backend`)**: Choose between **FastAPI** (SQLAlchemy + Alembic), **Flask** (Flask-SQLAlchemy + Flask-Migrate), or **Django** (native ORM + DRF ModelViewSets + simplejwt) via a single flag. All three backends share the same CRUD feature set, migration wiring, and seed data support.
+- **Pluggable Frontend Engine (`--frontend`)**: Choose between **React** (TypeScript + Vite + Tailwind CSS) or **Vue 3** (TypeScript + Vite + Tailwind CSS + Pinia + Vue Router) via a single flag. Both frontends share identical UI design, interactive SVG/Recharts trend charts, and CRUD capability sets.
 - **Iterative Updates (`sirius-init update`)**: Safely add new tables or columns to an existing project with automated migration autogeneration.
 
 ---

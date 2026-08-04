@@ -1,0 +1,18 @@
+{% raw %}
+<script setup lang="ts">
+defineProps<{
+  value: boolean
+}>()
+</script>
+
+<template>
+  <span :class="[
+    'px-2 py-0.5 rounded-full text-[10px] font-bold',
+    value
+      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+      : 'bg-slate-800 text-slate-400 border border-slate-700/50'
+  ]">
+    {{ value ? 'True' : 'False' }}
+  </span>
+</template>
+{% endraw %}

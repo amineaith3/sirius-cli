@@ -1,0 +1,112 @@
+<script setup lang="ts">
+import { Database, Table, LayoutDashboard, ChevronRight } from 'lucide-vue-next'
+{% if auth %}
+import { LogOut } from 'lucide-vue-next'
+import { useAuthStore } from './stores/auth'
+import Login from './pages/Login.vue'
+
+const authStore = useAuthStore()
+
+const handleLogout = () => {
+  authStore.logout()
+}
+{% endif %}
+</script>
+
+<template>
+  <div v-if="{% if auth %}!authStore.token{% else %}false{% endif %}">
+    <Login />
+  </div>
+  <div v-else class="flex min-h-screen bg-slate-950 text-slate-100 font-sans">
+    <!-- Sidebar -->
+    <aside class="w-64 border-r border-slate-900 bg-slate-950/70 backdrop-blur-xl flex flex-col p-6 fixed h-full z-10">
+      <div class="flex items-center gap-3 mb-8 px-2">
+        <div class="p-2.5 bg-brand-500/10 text-brand-400 rounded-xl border border-brand-500/20">
+          <Database class="w-6 h-6 animate-pulse" />
+        </div>
+        <div>
+          <h1 class="font-outfit font-bold text-lg bg-gradient-to-r from-brand-400 to-brand-300 bg-clip-text text-transparent">Proto Console</h1>
+          <p class="text-[10px] text-slate-500 tracking-wider uppercase font-semibold">Generated Admin</p>
+        </div>
+      </div>
+
+      <nav class="flex-1 space-y-1.5 overflow-y-auto pr-1">
+        <router-link
+          to="/"
+          custom
+          v-slot="{ href, navigate, isActive }"
+        >
+          <a
+            :href="href"
+            @click="navigate"
+            :class="[
+              'flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group',
+              isActive
+                ? 'bg-gradient-to-r from-brand-600 to-brand-700 text-white font-medium shadow-lg shadow-brand-500/20'
+                : 'text-slate-400 hover:text-slate-100 hover:bg-slate-900/60'
+            ]"
+          >
+            <LayoutDashboard :class="['w-5 h-5 transition-transform duration-200', isActive ? 'scale-110' : 'group-hover:scale-110']" />
+            <span class="text-sm font-outfit">Dashboard</span>
+            <ChevronRight v-if="isActive" class="w-4 h-4 ml-auto" />
+          </a>
+        </router-link>
+
+        <div class="pt-4 pb-2">
+          <p class="text-[10px] font-semibold text-slate-500 uppercase tracking-widest px-4">Tables</p>
+        </div>
+
+        {% for table_name, columns in schemas.items() %}
+        <router-link
+          to="/{{ table_name }}"
+          custom
+          v-slot="{ href, navigate, isActive }"
+        >
+          <a
+            :href="href"
+            @click="navigate"
+            :class="[
+              'flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group',
+              isActive
+                ? 'bg-gradient-to-r from-brand-600 to-brand-700 text-white font-medium shadow-lg shadow-brand-500/20'
+                : 'text-slate-400 hover:text-slate-100 hover:bg-slate-900/60'
+            ]"
+          >
+            <Table :class="['w-5 h-5 transition-transform duration-200', isActive ? 'scale-110' : 'group-hover:scale-110']" />
+            <span class="text-sm font-outfit">{{ table_name.replace('_', ' ').title() }}</span>
+            <ChevronRight v-if="isActive" class="w-4 h-4 ml-auto" />
+          </a>
+        </router-link>
+        {% endfor %}
+      </nav>
+
+      <div class="mt-auto border-t border-slate-900 pt-4 px-2">
+        {% if auth %}
+        <button 
+          @click="handleLogout"
+          class="flex w-full items-center gap-2 px-4 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-xl transition-all duration-200 mb-4"
+        >
+          <LogOut class="w-4 h-4" />
+          Logout
+        </button>
+        {% endif %}
+        <p class="text-xs text-slate-500">FastAPI + Vue SPA</p>
+        <p class="text-[10px] text-slate-600 mt-1">Status: <span class="text-emerald-500 font-semibold">Online</span></p>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 ml-64 min-h-screen flex flex-col bg-gradient-to-b from-slate-900/50 to-slate-950">
+      <header class="h-16 border-b border-slate-900/50 flex items-center px-8 bg-slate-950/50 backdrop-blur-md sticky top-0 z-20 justify-between">
+        <div class="flex items-center gap-2">
+          <span class="h-2 w-2 rounded-full bg-emerald-500 animate-ping"></span>
+          <span class="text-xs text-slate-400 font-medium">Development Instance</span>
+        </div>
+      </header>
+
+      <div class="p-8 flex-1">
+        <router-view />
+      </div>
+    </main>
+  </div>
+</template>

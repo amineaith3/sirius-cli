@@ -1,0 +1,27 @@
+import { createApp } from 'vue'
+import { createPinia } from 'pinia'
+import { createRouter, createWebHistory } from 'vue-router'
+import App from './App.vue'
+import Dashboard from './Dashboard.vue'
+import './index.css'
+
+{% for table_name, columns in schemas.items() %}
+import {{ table_name.replace('_', ' ').title().replace(' ', '') }}Crud from './pages/{{ table_name.replace('_', ' ').title().replace(' ', '') }}Crud.vue'
+{% endfor %}
+
+const routes = [
+  { path: '/', component: Dashboard },
+  {% for table_name, columns in schemas.items() %}
+  { path: '/{{ table_name }}', component: {{ table_name.replace('_', ' ').title().replace(' ', '') }}Crud },
+  {% endfor %}
+]
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes
+})
+
+const app = createApp(App)
+app.use(createPinia())
+app.use(router)
+app.mount('#app')

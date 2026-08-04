@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [0.5.2] — 2026-08-04
+
+### Added
+- Implemented `VueFrontendStrategy` in `sirius_cli/frontends/vue.py` and registered it, enabling full Vue 3 frontend scaffolding via `--frontend=vue`.
+- Added 20 new Vue 3 templates under `sirius_cli/templates/frontends/vue/`: `index.html`, `package.json`, `tsconfig.json`, `vite.config.ts`, `tailwind.config.js`, `postcss.config.js`, `Dockerfile`, `.env`, and full source files (`main.ts`, `index.css`, `App.vue`, `Dashboard.vue`, `Login.vue`, `TableCrud.vue`, components).
+- Built native, lightweight responsive SVG-based trend bar charts in `Dashboard.vue` with dynamic interactive tooltips, matching React's Recharts styling with zero external charting package dependencies.
+- Added full parity with React on cursor-based Vue Router pagination stack, server-side search/sort routing, custom Boolean badges, toast triggers, and foreign-key relation redirects.
+- Configured Pinia reactive store in `stores/auth.ts` to manage user auth token status.
+- Added 3 new automated Vue frontend strategy tests in `tests/test_frontend.py`.
+
 ## [0.5.1] — 2026-08-03
 
 ### Added
