@@ -1,0 +1,622 @@
+<script setup lang="ts">
+import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { Plus, X, Loader2, Search, Download, FileSpreadsheet } from 'lucide-vue-next'
+import SiriusTable, { ColumnSchema } from '../components/SiriusTable.vue'
+import SiriusPagination from '../components/SiriusPagination.vue'
+import SiriusDropdown from '../components/SiriusDropdown.vue'
+import SiriusError from '../components/SiriusError.vue'
+import SiriusToast from '../components/SiriusToast.vue'
+{% if auth %}
+import { useAuthStore } from '../stores/auth'
+{% endif %}
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
+interface RecordType {
+  id: number
+  [key: string]: any
+}
+
+{% if auth %}
+const authStore = useAuthStore()
+const getHeaders = () => ({
+  'Content-Type': 'application/json',
+  Authorization: `Bearer ${authStore.token || localStorage.getItem('token')}`
+})
+{% endif %}
+
+const route = useRoute()
+const router = useRouter()
+
+const records = ref<RecordType[]>([])
+const loading = ref(true)
+const submitting = ref(false)
+const error = ref<string | null>(null)
+const highlightId = ref<number | null>(null)
+const toast = ref<{ message: string; type: 'success' | 'error' } | null>(null)
+
+const showToast = (message: string, type: 'success' | 'error') => {
+  toast.value = { message, type }
+}
+
+const tableSchema: ColumnSchema[] = [
+  {% for col in columns %}
+  {
+    name: '{{ col.name }}',
+    type: '{{ col.type }}',
+    foreignKey: {% if col.foreign_key %}'{{ col.foreign_key }}'{% else %}null{% endif %},
+    isPk: {% if col.is_pk %}true{% else %}false{% endif %},
+    isRequired: {% if col.is_required %}true{% else %}false{% endif %}{% if col.enum_values is defined and col.enum_values %},
+    enumValues: {{ col.enum_values | tojson }}{% endif %}{% if col.pattern is defined and col.pattern %},
+    pattern: '{{ col.pattern }}'{% endif %}{% if col.placeholder is defined and col.placeholder %},
+    placeholder: '{{ col.placeholder }}'{% endif %}
+  },
+  {% endfor %}
+]
+
+// Pagination states
+const page = computed(() => {
+  const p = route.query.page
+  return p ? parseInt(p as string, 10) : 1
+})
+const currentCursor = computed(() => (route.query.cursor as string) || null)
+const limit = 10
+const cursorStack = ref<string[]>([])
+
+// Server-side search
+const search = ref('')
+const debouncedSearch = ref('')
+
+// Sort states
+const sortCol = ref<string | null>(null)
+const sortDir = ref<'asc' | 'desc'>('asc')
+
+// Modal states
+const isModalOpen = ref(false)
+const editingRecord = ref<RecordType | null>(null)
+
+// FK states
+{% for col in columns %}
+{% if col.foreign_key %}
+{% set target_table = col.foreign_key.split('.')[0] %}
+const {{ target_table }}Options = ref<any[]>([])
+const {{ target_table }}OptionsError = ref<string | null>(null)
+{% endif %}
+{% endfor %}
+
+// Form data reactive object
+const formData = reactive<Record<string, any>>({
+  {% for col in columns %}
+  {% if not col.is_pk %}
+  {% if col.type == 'Boolean' %}
+  {{ col.name }}: false,
+  {% else %}
+  {{ col.name }}: '',
+  {% endif %}
+  {% endif %}
+  {% endfor %}
+})
+
+const deleteConfirmId = ref<number | null>(null)
+
+// Debounce search input
+let debounceTimer: any = null
+watch(search, (newVal) => {
+  if (debounceTimer) clearTimeout(debounceTimer)
+  debounceTimer = setTimeout(() => {
+    if (debouncedSearch.value !== newVal) {
+      debouncedSearch.value = newVal
+      // Clear cursor and page
+      const query = { ...route.query }
+      delete query.cursor
+      query.page = '1'
+      router.replace({ query })
+      cursorStack.value = []
+    }
+  }, 350)
+})
+
+// Highlight param scroll & flash
+const checkAndHighlight = () => {
+  const highlight = route.query.highlight
+  if (!highlight) return
+  const id = parseInt(highlight as string, 10)
+  highlightId.value = id
+
+  // Clear highlight from URL query
+  const query = { ...route.query }
+  delete query.highlight
+  router.replace({ query })
+
+  // Graceful 404 check
+  fetch(`${API_BASE}/api/{{ table_name }}/${id}`{% if auth %}, { headers: getHeaders() }{% endif %})
+    .then(res => {
+      if (res.status === 404) {
+        showToast(`Record #${id} not found (it may have been deleted)`, 'error')
+      }
+    })
+    .catch(() => {})
+}
+
+// Watch route queries to trigger highlights or fetching
+watch(() => route.query.highlight, () => {
+  checkAndHighlight()
+})
+
+const fetchRecords = async () => {
+  try {
+    loading.value = true
+    const params = new URLSearchParams({
+      limit: String(limit + 1)
+    })
+    if (currentCursor.value) params.set('cursor', currentCursor.value)
+    if (debouncedSearch.value) params.set('search', debouncedSearch.value)
+    if (sortCol.value) {
+      params.set('order_by', sortCol.value)
+      params.set('dir', sortDir.value)
+    }
+
+    const res = await fetch(`${API_BASE}/api/{{ table_name }}?${params}`{% if auth %}, { headers: getHeaders() }{% endif %})
+    if (!res.ok) throw new Error('Failed to load data from server')
+    const data = await res.json()
+    records.value = data
+    error.value = null
+  } catch (err: any) {
+    error.value = err.message || 'Something went wrong'
+  } finally {
+    loading.value = false
+  }
+}
+
+// Fetch records when query params or sort changes
+watch([currentCursor, debouncedSearch, sortCol, sortDir], () => {
+  fetchRecords()
+})
+
+onMounted(() => {
+  fetchRecords()
+  checkAndHighlight()
+
+  // Fetch Foreign Key options
+  {% for col in columns %}
+  {% if col.foreign_key %}
+  {% set target_table = col.foreign_key.split('.')[0] %}
+  fetch(`${API_BASE}/api/{{ target_table }}?limit=500`{% if auth %}, { headers: getHeaders() }{% endif %})
+    .then(res => {
+      if (!res.ok) throw new Error(`Server responded ${res.status}`)
+      return res.json()
+    })
+    .then(data => {
+      {{ target_table }}Options.value = data
+    })
+    .catch(err => {
+      console.error("Failed to load options for {{ target_table }}", err)
+      {{ target_table }}OptionsError.value = err.message || 'Failed to load options'
+    })
+  {% endif %}
+  {% endfor %}
+})
+
+const foreignKeyOptions = computed<Record<string, any[]>>(() => ({
+  {% for col in columns %}
+  {% if col.foreign_key %}
+  {% set target_table = col.foreign_key.split('.')[0] %}
+  '{{ target_table }}': {{ target_table }}Options.value,
+  {% endif %}
+  {% endfor %}
+}))
+
+const openCreateModal = () => {
+  editingRecord.value = null
+  // Reset form
+  {% for col in columns %}
+  {% if not col.is_pk %}
+  {% if col.type == 'Boolean' %}
+  formData.{{ col.name }} = false
+  {% else %}
+  formData.{{ col.name }} = ''
+  {% endif %}
+  {% endif %}
+  {% endfor %}
+  isModalOpen.value = true
+}
+
+const openEditModal = (record: RecordType) => {
+  editingRecord.value = record
+  // Fill form
+  {% for col in columns %}
+  {% if not col.is_pk %}
+  {% if col.type == 'DateTime' %}
+  if (record.{{ col.name }}) {
+    formData.{{ col.name }} = new Date(record.{{ col.name }}).toISOString().slice(0, 16)
+  } else {
+    formData.{{ col.name }} = ''
+  }
+  {% else %}
+  formData.{{ col.name }} = record.{{ col.name }} !== null && record.{{ col.name }} !== undefined ? record.{{ col.name }} : ''
+  {% endif %}
+  {% endif %}
+  {% endfor %}
+  isModalOpen.value = true
+}
+
+const handleSubmit = async () => {
+  submitting.value = true
+  try {
+    const url = editingRecord.value
+      ? `${API_BASE}/api/{{ table_name }}/${editingRecord.value.id}`
+      : `${API_BASE}/api/{{ table_name }}`
+    const method = editingRecord.value ? 'PUT' : 'POST'
+
+    const payload: Record<string, any> = {}
+    {% for col in columns %}
+    {% if not col.is_pk %}
+    {% if col.type == 'Integer' %}
+    payload.{{ col.name }} = formData.{{ col.name }} !== '' && formData.{{ col.name }} !== null ? parseInt(formData.{{ col.name }}, 10) : null
+    {% elif col.type == 'Float' %}
+    payload.{{ col.name }} = formData.{{ col.name }} !== '' && formData.{{ col.name }} !== null ? parseFloat(formData.{{ col.name }}) : null
+    {% elif col.type == 'Boolean' %}
+    payload.{{ col.name }} = !!formData.{{ col.name }}
+    {% elif col.type == 'DateTime' %}
+    payload.{{ col.name }} = formData.{{ col.name }} !== '' && formData.{{ col.name }} !== null ? new Date(formData.{{ col.name }}).toISOString() : null
+    {% else %}
+    payload.{{ col.name }} = formData.{{ col.name }} || null
+    {% endif %}
+    {% endif %}
+    {% endfor %}
+
+    const res = await fetch(url, {
+      method,
+      headers: {
+        'Content-Type': 'application/json'{% if auth %},
+        'Authorization': `Bearer ${authStore.token || localStorage.getItem('token')}`{% endif %}
+      },
+      body: JSON.stringify(payload)
+    })
+
+    if (!res.ok) throw new Error('Failed to save record')
+
+    isModalOpen.value = false
+    fetchRecords()
+    showToast(editingRecord.value ? 'Record updated successfully' : 'Record created successfully', 'success')
+  } catch (err: any) {
+    showToast(err.message || 'Error saving record', 'error')
+  } finally {
+    submitting.value = false
+  }
+}
+
+const handleDelete = async (id: number) => {
+  try {
+    const res = await fetch(`${API_BASE}/api/{{ table_name }}/${id}`, {
+      method: 'DELETE'{% if auth %},
+      headers: {
+        Authorization: `Bearer ${authStore.token || localStorage.getItem('token')}`
+      }{% endif %}
+    })
+    if (!res.ok) throw new Error('Failed to delete record')
+    deleteConfirmId.value = null
+    fetchRecords()
+    showToast('Record deleted successfully', 'success')
+  } catch (err: any) {
+    showToast(err.message || 'Error deleting record', 'error')
+  }
+}
+
+const handleExport = async (fmt: 'csv' | 'xlsx') => {
+  {% if auth %}
+  try {
+    const res = await fetch(`${API_BASE}/api/{{ table_name }}/export?fmt=${fmt}`, {
+      headers: {
+        Authorization: `Bearer ${authStore.token || localStorage.getItem('token')}`
+      }
+    })
+    if (!res.ok) throw new Error('Export failed')
+    const blob = await res.blob()
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `{{ table_name }}.${fmt}`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    window.URL.revokeObjectURL(url)
+  } catch (err: any) {
+    alert(err.message || 'Export failed')
+  }
+  {% else %}
+  window.open(`${API_BASE}/api/{{ table_name }}/export?fmt=${fmt}`, '_blank')
+  {% endif %}
+}
+
+const handleSort = (colName: string) => {
+  if (sortCol.value === colName) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortCol.value = colName
+    sortDir.value = 'asc'
+  }
+  const query = { ...route.query }
+  delete query.cursor
+  query.page = '1'
+  router.replace({ query })
+  cursorStack.value = []
+}
+
+const hasNextPage = computed(() => records.value.length > limit)
+const displayedRecords = computed(() => hasNextPage.value ? records.value.slice(0, limit) : records.value)
+
+const handleNextPage = () => {
+  if (!hasNextPage.value || displayedRecords.value.length === 0) return
+  const lastRecord = displayedRecords.value[displayedRecords.value.length - 1]
+  const sortVal = sortCol.value ? lastRecord[sortCol.value] : null
+  const nextCursorData = { id: lastRecord.id, val: sortVal }
+  const nextCursorString = btoa(JSON.stringify(nextCursorData))
+
+  cursorStack.value.push(currentCursor.value || '')
+
+  router.replace({
+    query: {
+      ...route.query,
+      cursor: nextCursorString,
+      page: String(page.value + 1)
+    }
+  })
+}
+
+const handlePrevPage = () => {
+  if (page.value <= 1) return
+  const prevCursor = cursorStack.value.pop()
+
+  const query = { ...route.query }
+  if (prevCursor) {
+    query.cursor = prevCursor
+  } else {
+    delete query.cursor
+  }
+  query.page = String(page.value - 1)
+
+  router.replace({ query })
+}
+</script>
+
+<template>
+  <div class="space-y-6">
+    <!-- Header Panel -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div>
+        <h2 class="text-2xl font-bold font-outfit text-white capitalize">
+          {{ table_name.replace('_', ' ') }}
+        </h2>
+        <p class="text-slate-400 text-xs mt-1 font-sans">
+          Create, update, and manage entries for {{ table_name }}.
+        </p>
+      </div>
+
+      <div class="flex gap-2">
+        <button
+          @click="handleExport('csv')"
+          class="flex items-center gap-2 px-4 py-2.5 bg-slate-900 border border-slate-800 hover:bg-slate-800 rounded-xl text-xs font-semibold text-slate-300 transition-all"
+        >
+          <Download class="w-4 h-4 text-slate-400" />
+          CSV
+        </button>
+        <button
+          @click="handleExport('xlsx')"
+          class="flex items-center gap-2 px-4 py-2.5 bg-slate-900 border border-slate-800 hover:bg-slate-800 rounded-xl text-xs font-semibold text-slate-300 transition-all"
+        >
+          <FileSpreadsheet class="w-4 h-4 text-emerald-400" />
+          Excel
+        </button>
+        <button
+          @click="openCreateModal"
+          class="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-brand-600 to-brand-700 hover:from-brand-500 hover:to-brand-600 rounded-xl text-xs font-semibold shadow-lg shadow-brand-500/20 text-white transition-all"
+        >
+          <Plus class="w-4 h-4" />
+          Add Record
+        </button>
+      </div>
+    </div>
+
+    <!-- Search & Stats Bar -->
+    <div class="flex flex-col sm:flex-row gap-4 items-center justify-between bg-slate-900/30 p-4 border border-slate-900 rounded-xl">
+      <div class="relative w-full sm:w-80">
+        <Search class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+        <input
+          type="text"
+          placeholder="Search all records..."
+          v-model="search"
+          class="w-full pl-10 pr-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs focus:border-brand-500 focus:outline-none text-slate-300 transition-colors"
+        />
+      </div>
+      <div class="text-xs text-slate-500 font-medium flex items-center gap-2">
+        <span v-if="debouncedSearch" class="px-2 py-0.5 rounded-md bg-brand-500/10 border border-brand-500/20 text-brand-400 text-[10px] font-semibold">
+          Server search
+        </span>
+        Showing {% raw %}{{ displayedRecords.length }}{% endraw %} record{% raw %}{{ displayedRecords.length !== 1 ? 's' : '' }}{% endraw %} on this page
+      </div>
+    </div>
+
+    <!-- Main Grid/Table -->
+    <SiriusError v-if="error" :message="error" />
+    <div v-else class="flex flex-col gap-4">
+      <div class="relative">
+        <SiriusTable
+          :schema="tableSchema"
+          :records="displayedRecords"
+          :sortCol="sortCol"
+          :sortDir="sortDir"
+          :deleteConfirmId="deleteConfirmId"
+          :highlightId="highlightId"
+          :foreignKeyOptions="foreignKeyOptions"
+          :loading="loading"
+          @sort="handleSort"
+          @edit="openEditModal"
+          @delete="handleDelete"
+          @set-delete-confirm-id="id => deleteConfirmId = id"
+          @add="openCreateModal"
+        />
+        <div v-if="loading && displayedRecords.length > 0" class="absolute inset-0 bg-slate-950/40 backdrop-blur-[1px] rounded-2xl flex items-center justify-center transition-all duration-300">
+          <div class="flex items-center gap-3 px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl shadow-xl">
+            <Loader2 class="w-4 h-4 text-brand-500 animate-spin" />
+            <span class="text-xs text-slate-300 font-medium">Updating...</span>
+          </div>
+        </div>
+      </div>
+      <SiriusPagination
+        v-if="!loading && displayedRecords.length > 0"
+        :page="page"
+        :hasNextPage="hasNextPage"
+        @prev-page="handlePrevPage"
+        @next-page="handleNextPage"
+      />
+    </div>
+
+    <!-- Create / Edit Modal -->
+    <div v-if="isModalOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+      <div class="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
+        <header class="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+          <h3 class="font-outfit font-bold text-white text-base">
+            {% raw %}{{ editingRecord ? 'Update Record' : 'Create New Record' }}{% endraw %}
+          </h3>
+          <button
+            @click="isModalOpen = false"
+            class="text-slate-400 hover:text-white p-1 hover:bg-slate-800 rounded-lg transition-all"
+          >
+            <X class="w-4 h-4" />
+          </button>
+        </header>
+
+        <form @submit.prevent="handleSubmit" class="p-6 overflow-y-auto space-y-4 flex-1">
+          {% for col in columns %}
+          {% if not col.is_pk %}
+          <div class="flex flex-col gap-1.5">
+            <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-outfit">
+              {{ col.name.replace('_', ' ') }}
+            </label>
+
+            <!-- Relational dropdown -->
+            {% if col.foreign_key %}
+            {% set target_table = col.foreign_key.split('.')[0] %}
+            <SiriusDropdown
+              name="{{ col.name }}"
+              v-model="formData.{{ col.name }}"
+              :options="{{ target_table }}Options"
+              :error="{{ target_table }}OptionsError"
+              targetTable="{{ target_table }}"
+              :required="{% if col.is_required %}true{% else %}false{% endif %}"
+            />
+
+            <!-- Boolean checkbox -->
+            {% elif col.type == 'Boolean' %}
+            <div class="flex items-center gap-3 py-2">
+              <input
+                type="checkbox"
+                :id="'{{ col.name }}_field'"
+                name="{{ col.name }}"
+                v-model="formData.{{ col.name }}"
+                class="w-4.5 h-4.5 accent-brand-650 bg-slate-950 border border-slate-800 rounded focus:ring-0 focus:outline-none"
+              />
+              <label :for="'{{ col.name }}_field'" class="text-xs text-slate-300">
+                Enable
+              </label>
+            </div>
+
+            <!-- Integer input -->
+            {% elif col.type == 'Integer' %}
+            <input
+              type="number"
+              step="1"
+              {% if col.min_val is defined %}min="{{ col.min_val }}"{% endif %}
+              {% if col.max_val is defined %}max="{{ col.max_val }}"{% endif %}
+              name="{{ col.name }}"
+              v-model="formData.{{ col.name }}"
+              {% if col.is_required %}required{% endif %}
+              class="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs focus:border-brand-500 focus:outline-none text-slate-200 transition-colors"
+            />
+
+            <!-- Float input -->
+            {% elif col.type == 'Float' %}
+            <input
+              type="number"
+              step="any"
+              {% if col.min_val is defined %}min="{{ col.min_val }}"{% endif %}
+              {% if col.max_val is defined %}max="{{ col.max_val }}"{% endif %}
+              name="{{ col.name }}"
+              v-model="formData.{{ col.name }}"
+              {% if col.is_required %}required{% endif %}
+              class="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs focus:border-brand-500 focus:outline-none text-slate-200 transition-colors"
+            />
+
+            <!-- DateTime input -->
+            {% elif col.type == 'DateTime' %}
+            <input
+              type="datetime-local"
+              name="{{ col.name }}"
+              v-model="formData.{{ col.name }}"
+              {% if col.is_required %}required{% endif %}
+              class="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs focus:border-brand-500 focus:outline-none text-slate-200 transition-colors"
+            />
+
+            <!-- Enum select select list -->
+            {% elif col.enum_values is defined and col.enum_values %}
+            <select
+              name="{{ col.name }}"
+              v-model="formData.{{ col.name }}"
+              {% if col.is_required %}required{% endif %}
+              class="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs focus:border-brand-500 focus:outline-none text-slate-200 transition-colors"
+            >
+              <option value="">Select {{ col.name.replace('_', ' ') }}...</option>
+              {% for val in col.enum_values %}
+              <option value="{{ val }}">{{ val }}</option>
+              {% endfor %}
+            </select>
+
+            <!-- General string input with heuristics (email, phone, zip) -->
+            {% else %}
+            <input
+              :type="{% if 'email' in col.name %}'email'{% else %}'text'{% endif %}"
+              name="{{ col.name }}"
+              v-model="formData.{{ col.name }}"
+              {% if col.is_required %}required{% endif %}
+              {% if col.pattern is defined and col.pattern %}pattern="{{ col.pattern }}"{% endif %}
+              {% if col.placeholder is defined and col.placeholder %}placeholder="{{ col.placeholder }}"{% endif %}
+              {% if col.placeholder is defined and col.placeholder %}title="Expected format: {{ col.placeholder }}"{% endif %}
+              class="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs focus:border-brand-500 focus:outline-none text-slate-200 transition-colors"
+            />
+            {% endif %}
+          </div>
+          {% endif %}
+          {% endfor %}
+
+          <div class="pt-4 border-t border-slate-800 flex items-center justify-end gap-3">
+            <button
+              type="button"
+              @click="isModalOpen = false"
+              class="px-4 py-2 bg-slate-800 hover:bg-slate-750 text-slate-300 font-semibold text-xs rounded-xl transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              :disabled="submitting"
+              class="flex items-center gap-1.5 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white font-semibold text-xs rounded-xl disabled:opacity-50 transition-all shadow-lg shadow-brand-500/10"
+            >
+              <Loader2 v-if="submitting" class="w-3.5 h-3.5 animate-spin" />
+              Save
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <SiriusToast
+      v-if="toast"
+      :message="toast.message"
+      :type="toast.type"
+      @close="toast = null"
+    />
+  </div>
+</template>

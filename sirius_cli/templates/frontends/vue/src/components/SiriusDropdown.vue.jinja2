@@ -1,0 +1,37 @@
+{% raw %}
+<script setup lang="ts">
+defineProps<{
+  name: string
+  modelValue: string | number | null | undefined
+  options: any[]
+  error?: string | null
+  targetTable: string
+  required?: boolean
+}>()
+
+const emit = defineEmits<{
+  (e: 'update:modelValue', value: any): void
+}>()
+
+const handleSelect = (event: Event) => {
+  const target = event.target as HTMLSelectElement
+  emit('update:modelValue', target.value)
+}
+</script>
+
+<template>
+  <select
+    :name="name"
+    :value="modelValue !== undefined && modelValue !== null ? modelValue : ''"
+    @change="handleSelect"
+    :required="required"
+    class="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs focus:border-brand-500 focus:outline-none text-slate-200 transition-colors w-full"
+  >
+    <option value="">Select {{ targetTable.replace('_', ' ') }}</option>
+    <option v-if="error" disabled>Failed to load options</option>
+    <option v-else v-for="opt in options" :key="opt.id" :value="opt.id">
+      {{ opt.name || opt.username || opt.email || opt.title || opt.label || `ID: ${opt.id}` }}
+    </option>
+  </select>
+</template>
+{% endraw %}

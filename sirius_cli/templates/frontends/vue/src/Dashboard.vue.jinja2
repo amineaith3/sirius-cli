@@ -1,0 +1,452 @@
+<script setup lang="ts">
+import { ref, onMounted, computed } from 'vue'
+import { Table, Layers, Hash, Calendar, ArrowRight, RefreshCw, BarChart2 } from 'lucide-vue-next'
+{% if auth %}
+import { useAuthStore } from './stores/auth'
+{% endif %}
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
+interface TableMetadata {
+  name: string
+  count: number
+  columns: Array<{ name: string; type: string; is_pk: boolean }>
+}
+
+const metadata = ref<TableMetadata[]>([])
+const loading = ref(true)
+const error = ref<string | null>(null)
+const tableData = ref<Record<string, any[]>>({})
+const chartsLoading = ref<Record<string, boolean>>({})
+const chartsError = ref<Record<string, string | null>>({})
+
+{% if auth %}
+const authStore = useAuthStore()
+const getHeaders = () => ({
+  Authorization: `Bearer ${authStore.token || localStorage.getItem('token')}`
+})
+{% endif %}
+
+const fetchAllTableData = async (tables: TableMetadata[]) => {
+  for (const table of tables) {
+    try {
+      chartsLoading.value[table.name] = true
+      const res = await fetch(`${API_BASE}/api/${table.name}?limit=500`{% if auth %}, { headers: getHeaders() }{% endif %})
+      if (!res.ok) throw new Error(`Failed to fetch ${table.name} data`)
+      const data = await res.json()
+      tableData.value[table.name] = data
+      chartsError.value[table.name] = null
+    } catch (err: any) {
+      chartsError.value[table.name] = err.message || 'Failed to load'
+    } finally {
+      chartsLoading.value[table.name] = false
+    }
+  }
+}
+
+const fetchMetadata = async () => {
+  try {
+    loading.value = true
+    const res = await fetch(`${API_BASE}/api/metadata`{% if auth %}, { headers: getHeaders() }{% endif %})
+    if (!res.ok) throw new Error('Failed to fetch system metadata')
+    const data = await res.json()
+    metadata.value = data
+    error.value = null
+    await fetchAllTableData(data)
+  } catch (err: any) {
+    error.value = err.message || 'Something went wrong'
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(() => {
+  fetchMetadata()
+})
+
+const findDateColumn = (table: TableMetadata) => {
+  const dateTimeCol = table.columns.find(col => col.type === 'DateTime')
+  if (dateTimeCol) return dateTimeCol.name
+
+  const nameMatch = table.columns.find(col => {
+    const n = col.name.toLowerCase()
+    return n === 'created_at' || n === 'updated_at' || n.endsWith('_at') || n.endsWith('_date') || n === 'date'
+  })
+  return nameMatch ? nameMatch.name : null
+}
+
+const getChartData = (table: TableMetadata) => {
+  const data = tableData.value[table.name] || []
+  const dateFieldName = findDateColumn(table)
+
+  if (!dateFieldName || data.length === 0) {
+    return {
+      data: [{ name: 'Total Records', count: table.count }],
+      isFallback: true,
+      dateField: null
+    }
+  }
+
+  const counts: Record<string, number> = {}
+  data.forEach(row => {
+    const rawVal = row[dateFieldName]
+    if (!rawVal) return
+
+    let dateStr = ''
+    try {
+      const dateObj = new Date(rawVal)
+      if (!isNaN(dateObj.getTime())) {
+        dateStr = dateObj.toISOString().split('T')[0]
+      } else {
+        dateStr = String(rawVal).split('T')[0].split(' ')[0]
+      }
+    } catch {
+      dateStr = String(rawVal).split('T')[0].split(' ')[0]
+    }
+
+    if (dateStr) {
+      counts[dateStr] = (counts[dateStr] || 0) + 1
+    }
+  })
+
+  const chartData = Object.entries(counts).map(([date, count]) => ({
+    name: date,
+    count
+  }))
+
+  chartData.sort((a, b) => new Date(a.name).getTime() - new Date(b.name).getTime())
+
+  if (chartData.length === 0) {
+    return {
+      data: [{ name: 'Total Records', count: table.count }],
+      isFallback: true,
+      dateField: null
+    }
+  }
+
+  return {
+    data: chartData.slice(-15),
+    isFallback: false,
+    dateField: dateFieldName
+  }
+}
+
+const totalTables = computed(() => metadata.value.length)
+const totalRows = computed(() => metadata.value.reduce((acc, curr) => acc + curr.count, 0))
+
+// For custom SVG rendering
+const getSvgChartElements = (table: TableMetadata) => {
+  const { data, isFallback } = getChartData(table)
+  const maxCount = Math.max(...data.map(d => d.count), 1)
+
+  const width = 450
+  const height = 140
+  const paddingLeft = 35
+  const paddingBottom = 20
+  const paddingTop = 10
+  const paddingRight = 10
+
+  const chartWidth = width - paddingLeft - paddingRight
+  const chartHeight = height - paddingTop - paddingBottom
+
+  const barWidth = isFallback ? 50 : Math.min(25, chartWidth / (data.length * 1.5))
+  const spacing = (chartWidth - (barWidth * data.length)) / Math.max(1, data.length - 1)
+
+  const bars = data.map((d, i) => {
+    const barHeight = (d.count / maxCount) * chartHeight
+    const x = paddingLeft + i * (barWidth + spacing)
+    const y = height - paddingBottom - barHeight
+    return {
+      x,
+      y,
+      width: barWidth,
+      height: barHeight,
+      name: d.name,
+      count: d.count
+    }
+  })
+
+  // Y-axis grid lines (3 divisions)
+  const yTicks = [0, 0.5, 1].map(ratio => {
+    const val = Math.round(ratio * maxCount)
+    const y = height - paddingBottom - (ratio * chartHeight)
+    return {
+      y,
+      label: val >= 1000 ? `${(val / 1000).toFixed(1)}k` : String(val)
+    }
+  })
+
+  // X-axis labels
+  const xLabels = data.map((d, i) => {
+    const x = paddingLeft + i * (barWidth + spacing) + barWidth / 2
+    let labelText = d.name
+    if (!isFallback) {
+      const parts = d.name.split('-')
+      if (parts.length >= 3) {
+        labelText = `${parts[1]}/${parts[2]}`
+      }
+    }
+    return { x, text: labelText }
+  })
+
+  return { bars, yTicks, xLabels, width, height, paddingLeft, paddingBottom }
+}
+
+const activeTooltip = ref<{ table: string; index: number; x: number; y: number; name: string; count: number } | null>(null)
+
+const showTooltip = (tableName: string, index: number, event: MouseEvent, item: any) => {
+  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  const parentRect = (event.currentTarget as HTMLElement).parentElement?.getBoundingClientRect()
+  if (rect && parentRect) {
+    activeTooltip.value = {
+      table: tableName,
+      index,
+      x: rect.left - parentRect.left + rect.width / 2,
+      y: rect.top - parentRect.top - 40,
+      name: item.name,
+      count: item.count
+    }
+  }
+}
+
+const hideTooltip = () => {
+  activeTooltip.value = null
+}
+</script>
+
+{% raw %}
+<template>
+  <div class="space-y-8">
+    <!-- Top Banner -->
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div>
+        <h2 class="text-3xl font-outfit font-bold tracking-tight bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
+          System Overview
+        </h2>
+        <p class="text-slate-400 mt-1 text-sm font-sans">
+          Overview of autogenerated tables, records, and database stats.
+        </p>
+      </div>
+      <button
+        @click="fetchMetadata"
+        class="flex items-center gap-2 px-4 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs font-semibold hover:bg-slate-800 transition-all text-slate-300"
+      >
+        <RefreshCw :class="['w-3.5 h-3.5', loading ? 'animate-spin' : '']" />
+        Refresh Stats
+      </button>
+    </div>
+
+    <!-- Stats Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div class="p-6 bg-slate-900/40 border border-slate-900 rounded-2xl relative overflow-hidden group hover:border-slate-800 transition-all duration-300">
+        <div class="absolute top-0 right-0 p-8 text-brand-500/10 transition-transform duration-300 group-hover:scale-110">
+          <Layers class="w-24 h-24" />
+        </div>
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-widest">Total Tables</p>
+        <p class="text-4xl font-bold font-outfit mt-2">{{ totalTables }}</p>
+        <p class="text-xs text-slate-400 mt-2">Discovered in schema parse</p>
+      </div>
+
+      <div class="p-6 bg-slate-900/40 border border-slate-900 rounded-2xl relative overflow-hidden group hover:border-slate-800 transition-all duration-300">
+        <div class="absolute top-0 right-0 p-8 text-brand-500/10 transition-transform duration-300 group-hover:scale-110">
+          <Hash class="w-24 h-24" />
+        </div>
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-widest">Total Rows</p>
+        <p class="text-4xl font-bold font-outfit mt-2">{{ totalRows }}</p>
+        <p class="text-xs text-slate-400 mt-2">Stored across all tables</p>
+      </div>
+
+      <div class="p-6 bg-slate-900/40 border border-slate-900 rounded-2xl relative overflow-hidden group hover:border-slate-800 transition-all duration-300 md:col-span-2 lg:col-span-1">
+        <div class="absolute top-0 right-0 p-8 text-emerald-500/10 transition-transform duration-300 group-hover:scale-110">
+          <Calendar class="w-24 h-24" />
+        </div>
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-widest">Server Status</p>
+        <p class="text-4xl font-bold font-outfit mt-2">Active</p>
+        <p class="text-xs text-slate-400 mt-2 flex items-center gap-1.5">
+          <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span> Live sync connection
+        </p>
+      </div>
+    </div>
+
+    <!-- Entity Charts Grid -->
+    <div v-if="!loading && !error && metadata.length > 0" class="space-y-6">
+      <h3 class="text-lg font-bold font-outfit text-slate-200 flex items-center gap-2">
+        <BarChart2 class="w-5 h-5 text-brand-400" />
+        Entity Trends & Activity
+      </h3>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div
+          v-for="table in metadata"
+          :key="table.name"
+          class="p-6 bg-slate-900/30 border border-slate-900 rounded-2xl flex flex-col justify-between h-80 relative"
+        >
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h4 class="text-sm font-bold text-white capitalize font-outfit">
+                {{ table.name.replace('_', ' ') }}
+              </h4>
+              <p class="text-[10px] text-slate-500 mt-0.5">
+                {{ getChartData(table).isFallback ? 'Total records count fallback' : `Trend grouped by date (${getChartData(table).dateField})` }}
+              </p>
+            </div>
+            <span class="text-[10px] px-2 py-0.5 bg-slate-800 text-slate-400 rounded-md font-mono">
+              {{ table.count }} total rows
+            </span>
+          </div>
+
+          <div class="flex-1 w-full relative min-h-0 flex items-center justify-center">
+            <div v-if="chartsLoading[table.name]" class="w-full h-full flex flex-col gap-3 justify-center items-center animate-pulse">
+              <div class="w-full h-40 bg-slate-800/20 rounded-xl" />
+              <div class="w-1/3 h-3.5 bg-slate-800/20 rounded" />
+            </div>
+            <div v-else-if="chartsError[table.name]" class="text-center p-4 border border-red-500/10 bg-red-500/5 rounded-xl">
+              <p class="text-xs text-red-400 font-semibold">{{ chartsError[table.name] }}</p>
+            </div>
+            <div v-else-if="!tableData[table.name] || tableData[table.name].length === 0" class="text-center py-8">
+              <p class="text-xs text-slate-500 font-medium">No records available for this entity</p>
+            </div>
+            <div v-else class="h-full w-full relative">
+              <!-- Custom SVG Chart -->
+              <svg
+                v-if="getSvgChartElements(table)"
+                :viewBox="`0 0 ${getSvgChartElements(table).width} ${getSvgChartElements(table).height}`"
+                class="w-full h-full"
+              >
+                <!-- Horizontal Grid Lines -->
+                <line
+                  v-for="tick in getSvgChartElements(table).yTicks"
+                  :key="tick.y"
+                  :x1="getSvgChartElements(table).paddingLeft"
+                  :y1="tick.y"
+                  :x2="getSvgChartElements(table).width"
+                  :y2="tick.y"
+                  stroke="#1e293b"
+                  stroke-dasharray="3 3"
+                />
+
+                <!-- Bars -->
+                <rect
+                  v-for="(bar, idx) in getSvgChartElements(table).bars"
+                  :key="idx"
+                  :x="bar.x"
+                  :y="bar.y"
+                  :width="bar.width"
+                  :height="bar.height"
+                  fill="#0ea5e9"
+                  rx="2"
+                  ry="2"
+                  class="cursor-pointer transition-colors hover:fill-sky-400"
+                  @mouseover="showTooltip(table.name, idx, $event, bar)"
+                  @mouseleave="hideTooltip"
+                />
+
+                <!-- X Axis Labels -->
+                <text
+                  v-for="(label, idx) in getSvgChartElements(table).xLabels"
+                  :key="idx"
+                  :x="label.x"
+                  :y="getSvgChartElements(table).height - 5"
+                  text-anchor="middle"
+                  fill="#64748b"
+                  font-size="8"
+                  font-family="monospace"
+                >
+                  {{ label.text }}
+                </text>
+
+                <!-- Y Axis Labels -->
+                <text
+                  v-for="tick in getSvgChartElements(table).yTicks"
+                  :key="tick.y"
+                  :x="getSvgChartElements(table).paddingLeft - 5"
+                  :y="tick.y"
+                  text-anchor="end"
+                  fill="#64748b"
+                  font-size="8"
+                  alignment-baseline="middle"
+                  font-family="monospace"
+                >
+                  {{ tick.label }}
+                </text>
+              </svg>
+
+              <!-- Chart Tooltip -->
+              <div
+                v-if="activeTooltip && activeTooltip.table === table.name"
+                :style="{ left: activeTooltip.x + 'px', top: activeTooltip.y + 'px' }"
+                class="absolute -translate-x-1/2 z-30 pointer-events-none bg-slate-900 border border-slate-800 rounded-lg p-2 shadow-xl text-[10px]"
+              >
+                <div class="text-slate-400 uppercase tracking-wider font-semibold">{{ activeTooltip.name }}</div>
+                <div class="text-sky-400 font-bold font-mono mt-0.5">Count: {{ activeTooltip.count }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tables Navigator Section -->
+    <div>
+      <h3 class="text-lg font-bold font-outfit text-slate-200 mb-6 flex items-center gap-2">
+        <Table class="w-5 h-5 text-brand-400" />
+        Entity Navigator
+      </h3>
+
+      <div v-if="loading" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div v-for="n in [1, 2]" :key="n" class="h-48 rounded-2xl bg-slate-900/20 border border-slate-900/50 animate-pulse" />
+      </div>
+
+      <div v-else-if="error" class="p-6 border border-red-500/20 bg-red-500/5 text-red-400 rounded-2xl">
+        <p class="font-semibold text-sm">Failed to connect to backend server</p>
+        <p class="text-xs mt-1 text-red-400/80">Make sure the FastAPI backend is running on {{ API_BASE }}.</p>
+      </div>
+
+      <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div
+          v-for="table in metadata"
+          :key="table.name"
+          class="p-6 bg-slate-900/30 border border-slate-900 rounded-2xl hover:border-slate-800 transition-all duration-300 flex flex-col justify-between group"
+        >
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <h4 class="text-lg font-bold text-white group-hover:text-brand-400 transition-colors capitalize font-outfit">
+                {{ table.name.replace('_', ' ') }}
+              </h4>
+              <span class="px-2.5 py-1 bg-brand-500/10 text-brand-400 border border-brand-500/10 rounded-lg text-xs font-semibold">
+                {{ table.count }} row{{ table.count !== 1 ? 's' : '' }}
+              </span>
+            </div>
+
+            <p class="text-xs text-slate-400 mb-4">
+              Contains {{ table.columns.length }} columns:
+            </p>
+
+            <div class="flex flex-wrap gap-1.5 mb-6">
+              <span
+                v-for="col in table.columns"
+                :key="col.name"
+                :class="[
+                  'text-[10px] px-2 py-0.5 rounded-md font-mono',
+                  col.is_pk
+                    ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                    : 'bg-slate-800 text-slate-300'
+                ]"
+              >
+                {{ col.name }}: {{ col.type }}
+              </span>
+            </div>
+          </div>
+
+          <router-link
+            :to="`/${table.name}`"
+            class="flex items-center gap-2 text-xs font-semibold text-slate-300 hover:text-white mt-auto group/btn transition-colors"
+          >
+            Manage Records
+            <ArrowRight class="w-3.5 h-3.5 transform group-hover/btn:translate-x-1 transition-transform" />
+          </router-link>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+{% endraw %}

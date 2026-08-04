@@ -1,0 +1,38 @@
+{% raw %}
+<script setup lang="ts">
+import { onMounted } from 'vue'
+import { CheckCircle2, AlertCircle, X } from 'lucide-vue-next'
+
+const props = withDefaults(defineProps<{
+  message: string
+  type: 'success' | 'error'
+  duration?: number
+}>(), {
+  duration: 3000
+})
+
+const emit = defineEmits<{
+  (e: 'close'): void
+}>()
+
+onMounted(() => {
+  setTimeout(() => {
+    emit('close')
+  }, props.duration)
+})
+</script>
+
+<template>
+  <div class="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl border backdrop-blur-md shadow-2xl transition-all duration-300 animate-slide-in bg-slate-900/90 border-slate-800 text-slate-100 max-w-sm">
+    <CheckCircle2 v-if="type === 'success'" class="w-5 h-5 text-emerald-400 shrink-0" />
+    <AlertCircle v-else class="w-5 h-5 text-red-400 shrink-0" />
+    <p class="text-xs font-semibold font-outfit">{{ message }}</p>
+    <button
+      @click="$emit('close')"
+      class="ml-auto p-0.5 hover:bg-slate-800 rounded-md text-slate-400 hover:text-slate-200 transition-all cursor-pointer"
+    >
+      <X class="w-3.5 h-3.5" />
+    </button>
+  </div>
+</template>
+{% endraw %}

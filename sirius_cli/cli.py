@@ -116,7 +116,7 @@ def init(
     frontend: str = typer.Option(
         "react",
         "--frontend",
-        help="Frontend framework to generate (react)",
+        help="Frontend framework to generate (react, vue)",
     ),
 ):
     """Initializes a new backend and React frontend stack from data files or configuration."""
@@ -128,9 +128,9 @@ def init(
         )
         raise typer.Exit(code=1)
 
-    if frontend not in ("react",):
+    if frontend not in ("react", "vue"):
         typer.secho(
-            f"Error: Unsupported frontend '{frontend}'. Supported options: react.",
+            f"Error: Unsupported frontend '{frontend}'. Supported options: react, vue.",
             fg=typer.colors.RED,
             err=True,
         )
