@@ -35,7 +35,7 @@ Before using Sirius-CLI, ensure you have the following installed:
 - **JWT Auth Scaffold (`--auth`)**: Integrated bcrypt password hashing, JWT Bearer authentication routes, protected endpoint dependencies, and a React/Vue Login screen.
 - **In-Memory Instant Preview (`sirius-init preview`)**: Spin up an ephemeral backend + frontend preview directly in your browser without creating disk files.
 - **Pluggable Backend Engine (`--backend`)**: Choose between **FastAPI** (SQLAlchemy + Alembic), **Flask** (Flask-SQLAlchemy + Flask-Migrate), or **Django** (native ORM + DRF ModelViewSets + simplejwt) via a single flag. All three backends share the same CRUD feature set, migration wiring, and seed data support.
-- **Pluggable Frontend Engine (`--frontend`)**: Choose between **React** (TypeScript + Vite + Tailwind CSS) or **Vue 3** (TypeScript + Vite + Tailwind CSS + Pinia + Vue Router) via a single flag. Both frontends share identical UI design, interactive SVG/Recharts trend charts, and CRUD capability sets.
+- **Pluggable Frontend Engine (`--frontend`)**: Choose between **React** (TypeScript + Vite + Tailwind CSS) or **Vue 3** (TypeScript + Vite + Tailwind CSS + Pinia + Vue Router) via a single flag, with **SvelteKit** support planned for the next release. Both frontends share identical UI design, interactive SVG/Recharts trend charts, and CRUD capability sets.
 - **Iterative Updates (`sirius-init update`)**: Safely add new tables or columns to an existing project with automated migration autogeneration.
 
 ---
