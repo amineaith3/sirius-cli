@@ -1,0 +1,629 @@
+<script lang="ts">
+  import { onMount } from 'svelte';
+  import { page } from '$app/stores';
+  import { goto } from '$app/navigation';
+  import { Plus, X, Loader2, Search, Download, FileSpreadsheet } from 'lucide-svelte';
+  import SiriusTable, { type ColumnSchema } from '../../lib/components/SiriusTable.svelte';
+  import SiriusPagination from '../../lib/components/SiriusPagination.svelte';
+  import SiriusDropdown from '../../lib/components/SiriusDropdown.svelte';
+  import SiriusError from '../../lib/components/SiriusError.svelte';
+  import SiriusToast from '../../lib/components/SiriusToast.svelte';
+  {% if auth %}
+  import { token } from '../../lib/stores/auth';
+  {% endif %}
+
+  const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+
+  interface RecordType {
+    id: number;
+    [key: string]: any;
+  }
+
+  const getHeaders = (contentType = 'application/json') => {
+    const headers: Record<string, string> = {
+      'Content-Type': contentType
+    };
+    {% if auth %}
+    if ($token) {
+      headers['Authorization'] = `Bearer ${$token}`;
+    }
+    {% endif %}
+    return headers;
+  };
+
+  let records: RecordType[] = [];
+  let loading = true;
+  let submitting = false;
+  let error: string | null = null;
+  let highlightId: number | null = null;
+  let toast: { message: string; type: 'success' | 'error' } | null = null;
+
+  const showToast = (message: string, type: 'success' | 'error') => {
+    toast = { message, type };
+  };
+
+  const tableSchema: ColumnSchema[] = [
+    {% for col in columns %}
+    {
+      name: '{{ col.name }}',
+      type: '{{ col.type }}',
+      foreignKey: {% if col.foreign_key %}'{{ col.foreign_key }}'{% else %}null{% endif %},
+      isPk: {% if col.is_pk %}true{% else %}false{% endif %},
+      isRequired: {% if col.is_required %}true{% else %}false{% endif %}{% if col.enum_values is defined and col.enum_values %},
+      enumValues: {{ col.enum_values | tojson }}{% endif %}{% if col.pattern is defined and col.pattern %},
+      pattern: '{{ col.pattern }}'{% endif %}{% if col.placeholder is defined and col.placeholder %},
+      placeholder: '{{ col.placeholder }}'{% endif %}
+    },
+    {% endfor %}
+  ];
+
+  // Pagination states
+  $: pageQuery = $page.url.searchParams;
+  $: pageNum = parseInt(pageQuery.get('page') || '1', 10);
+  $: currentCursor = pageQuery.get('cursor') || null;
+  const limit = 10;
+  let cursorStack: string[] = [];
+
+  // Server-side search
+  let search = '';
+  let debouncedSearch = '';
+
+  // Sort states
+  let sortCol: string | null = null;
+  let sortDir: 'asc' | 'desc' = 'asc';
+
+  // Modal states
+  let isModalOpen = false;
+  let editingRecord: RecordType | null = null;
+
+  // FK states
+  {% for col in columns %}
+  {% if col.foreign_key %}
+  {% set target_table = col.foreign_key.split('.')[0] %}
+  let {{ target_table }}Options: any[] = [];
+  let {{ target_table }}OptionsError: string | null = null;
+  {% endif %}
+  {% endfor %}
+
+  // Form data state
+  let formData: Record<string, any> = {
+    {% for col in columns %}
+    {% if not col.is_pk %}
+    {% if col.type == 'Boolean' %}
+    {{ col.name }}: false,
+    {% else %}
+    {{ col.name }}: '',
+    {% endif %}
+    {% endif %}
+    {% endfor %}
+  };
+
+  let deleteConfirmId: number | null = null;
+
+  const updateQuery = (newParams: Record<string, string | null>) => {
+    const newUrl = new URL($page.url);
+    Object.entries(newParams).forEach(([k, v]) => {
+      if (v === null || v === undefined) {
+        newUrl.searchParams.delete(k);
+      } else {
+        newUrl.searchParams.set(k, v);
+      }
+    });
+    goto(newUrl.pathname + newUrl.search, { replaceState: true, keepFocus: true, noScroll: true });
+  };
+
+  // Debounce search input
+  let debounceTimer: any = null;
+  const handleSearchInput = () => {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      if (debouncedSearch !== search) {
+        debouncedSearch = search;
+        cursorStack = [];
+        updateQuery({ cursor: null, page: '1' });
+      }
+    }, 350);
+  };
+
+  $: if (search !== undefined) {
+    handleSearchInput();
+  }
+
+  // Highlight param scroll & flash
+  const checkAndHighlight = () => {
+    const highlight = pageQuery.get('highlight');
+    if (!highlight) return;
+    const id = parseInt(highlight, 10);
+    highlightId = id;
+
+    // Clear highlight from URL query
+    updateQuery({ highlight: null });
+
+    // Graceful 404 check
+    fetch(`${API_BASE}/api/{{ table_name }}/${id}`, { headers: getHeaders() })
+      .then(res => {
+        if (res.status === 404) {
+          showToast(`Record #${id} not found (it may have been deleted)`, 'error');
+        }
+      })
+      .catch(() => {});
+  };
+
+  $: if ($page.url.searchParams.has('highlight')) {
+    checkAndHighlight();
+  }
+
+  const fetchRecords = async () => {
+    try {
+      loading = true;
+      const params = new URLSearchParams({
+        limit: String(limit + 1)
+      });
+      if (currentCursor) params.set('cursor', currentCursor);
+      if (debouncedSearch) params.set('search', debouncedSearch);
+      if (sortCol) {
+        params.set('order_by', sortCol);
+        params.set('dir', sortDir);
+      }
+
+      const res = await fetch(`${API_BASE}/api/{{ table_name }}?${params}`, { headers: getHeaders() });
+      if (!res.ok) throw new Error('Failed to load data from server');
+      const data = await res.json();
+      records = data;
+      error = null;
+    } catch (err: any) {
+      error = err.message || 'Something went wrong';
+    } finally {
+      loading = false;
+    }
+  };
+
+  // Fetch records when query params or sort changes
+  $: {
+    // Svelte reactive dependencies:
+    currentCursor; debouncedSearch; sortCol; sortDir;
+    fetchRecords();
+  }
+
+  onMount(() => {
+    checkAndHighlight();
+
+    // Fetch Foreign Key options
+    {% for col in columns %}
+    {% if col.foreign_key %}
+    {% set target_table = col.foreign_key.split('.')[0] %}
+    fetch(`${API_BASE}/api/{{ target_table }}?limit=500`, { headers: getHeaders() })
+      .then(res => {
+        if (!res.ok) throw new Error(`Server responded ${res.status}`);
+        return res.json();
+      })
+      .then(data => {
+        {{ target_table }}Options = data;
+      })
+      .catch(err => {
+        console.error("Failed to load options for {{ target_table }}", err);
+        {{ target_table }}OptionsError = err.message || 'Failed to load options';
+      });
+    {% endif %}
+    {% endfor %}
+  });
+
+  $: foreignKeyOptions = {
+    {% for col in columns %}
+    {% if col.foreign_key %}
+    {% set target_table = col.foreign_key.split('.')[0] %}
+    '{{ target_table }}': {{ target_table }}Options,
+    {% endif %}
+    {% endfor %}
+  };
+
+  const openCreateModal = () => {
+    editingRecord = null;
+    // Reset form
+    formData = {
+      {% for col in columns %}
+      {% if not col.is_pk %}
+      {% if col.type == 'Boolean' %}
+      {{ col.name }}: false,
+      {% else %}
+      {{ col.name }}: '',
+      {% endif %}
+      {% endif %}
+      {% endfor %}
+    };
+    isModalOpen = true;
+  };
+
+  const openEditModal = (event: CustomEvent<RecordType>) => {
+    const record = event.detail;
+    editingRecord = record;
+    // Fill form
+    formData = {
+      {% for col in columns %}
+      {% if not col.is_pk %}
+      {% if col.type == 'DateTime' %}
+      {{ col.name }}: record.{{ col.name }} ? new Date(record.{{ col.name }}).toISOString().slice(0, 16) : '',
+      {% else %}
+      {{ col.name }}: record.{{ col.name }} !== null && record.{{ col.name }} !== undefined ? record.{{ col.name }} : '',
+      {% endif %}
+      {% endif %}
+      {% endfor %}
+    };
+    isModalOpen = true;
+  };
+
+  const handleSubmit = async () => {
+    submitting = true;
+    try {
+      const url = editingRecord
+        ? `${API_BASE}/api/{{ table_name }}/${editingRecord.id}`
+        : `${API_BASE}/api/{{ table_name }}`;
+      const method = editingRecord ? 'PUT' : 'POST';
+
+      const payload: Record<string, any> = {};
+      {% for col in columns %}
+      {% if not col.is_pk %}
+      {% if col.type == 'Integer' %}
+      payload.{{ col.name }} = formData.{{ col.name }} !== '' && formData.{{ col.name }} !== null ? parseInt(formData.{{ col.name }}, 10) : null;
+      {% elif col.type == 'Float' %}
+      payload.{{ col.name }} = formData.{{ col.name }} !== '' && formData.{{ col.name }} !== null ? parseFloat(formData.{{ col.name }}) : null;
+      {% elif col.type == 'Boolean' %}
+      payload.{{ col.name }} = !!formData.{{ col.name }};
+      {% elif col.type == 'DateTime' %}
+      payload.{{ col.name }} = formData.{{ col.name }} !== '' && formData.{{ col.name }} !== null ? new Date(formData.{{ col.name }}).toISOString() : null;
+      {% else %}
+      payload.{{ col.name }} = formData.{{ col.name }} || null;
+      {% endif %}
+      {% endif %}
+      {% endfor %}
+
+      const res = await fetch(url, {
+        method,
+        headers: getHeaders(),
+        body: JSON.stringify(payload)
+      });
+
+      if (!res.ok) throw new Error('Failed to save record');
+
+      isModalOpen = false;
+      fetchRecords();
+      showToast(editingRecord ? 'Record updated successfully' : 'Record created successfully', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Error saving record', 'error');
+    } finally {
+      submitting = false;
+    }
+  };
+
+  const handleDelete = async (event: CustomEvent<number>) => {
+    const id = event.detail;
+    try {
+      const res = await fetch(`${API_BASE}/api/{{ table_name }}/${id}`, {
+        method: 'DELETE',
+        headers: getHeaders()
+      });
+      if (!res.ok) throw new Error('Failed to delete record');
+      deleteConfirmId = null;
+      fetchRecords();
+      showToast('Record deleted successfully', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Error deleting record', 'error');
+    }
+  };
+
+  const handleExport = async (fmt: 'csv' | 'xlsx') => {
+    {% if auth %}
+    try {
+      const res = await fetch(`${API_BASE}/api/{{ table_name }}/export?fmt=${fmt}`, {
+        headers: getHeaders()
+      });
+      if (!res.ok) throw new Error('Export failed');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `{{ table_name }}.${fmt}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert(err.message || 'Export failed');
+    }
+    {% else %}
+    window.open(`${API_BASE}/api/{{ table_name }}/export?fmt=${fmt}`, '_blank');
+    {% endif %}
+  };
+
+  const handleSort = (event: CustomEvent<string>) => {
+    const colName = event.detail;
+    if (sortCol === colName) {
+      sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      sortCol = colName;
+      sortDir = 'asc';
+    }
+    cursorStack = [];
+    updateQuery({ cursor: null, page: '1' });
+  };
+
+  $: hasNextPage = records.length > limit;
+  $: displayedRecords = hasNextPage ? records.slice(0, limit) : records;
+
+  const handleNextPage = () => {
+    if (!hasNextPage || displayedRecords.length === 0) return;
+    const lastRecord = displayedRecords[displayedRecords.length - 1];
+    const sortVal = sortCol ? lastRecord[sortCol] : null;
+    const nextCursorData = { id: lastRecord.id, val: sortVal };
+    const nextCursorString = btoa(JSON.stringify(nextCursorData));
+
+    cursorStack = [...cursorStack, currentCursor || ''];
+
+    updateQuery({
+      cursor: nextCursorString,
+      page: String(pageNum + 1)
+    });
+  };
+
+  const handlePrevPage = () => {
+    if (pageNum <= 1) return;
+    const prevCursor = cursorStack.pop();
+    cursorStack = [...cursorStack];
+
+    updateQuery({
+      cursor: prevCursor || null,
+      page: String(pageNum - 1)
+    });
+  };
+</script>
+
+<div class="space-y-6">
+  <!-- Header Panel -->
+  <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+      <h2 class="text-2xl font-bold font-outfit text-white capitalize">
+        {{ table_name.replace('_', ' ') }}
+      </h2>
+      <p class="text-slate-400 text-xs mt-1 font-sans">
+        Create, update, and manage entries for {{ table_name }}.
+      </p>
+    </div>
+
+    <div class="flex gap-2">
+      <button
+        on:click={() => handleExport('csv')}
+        class="flex items-center gap-2 px-4 py-2.5 bg-slate-900 border border-slate-800 hover:bg-slate-800 rounded-xl text-xs font-semibold text-slate-300 transition-all"
+      >
+        <Download class="w-4 h-4 text-slate-400" />
+        CSV
+      </button>
+      <button
+        on:click={() => handleExport('xlsx')}
+        class="flex items-center gap-2 px-4 py-2.5 bg-slate-900 border border-slate-800 hover:bg-slate-800 rounded-xl text-xs font-semibold text-slate-300 transition-all"
+      >
+        <FileSpreadsheet class="w-4 h-4 text-emerald-400" />
+        Excel
+      </button>
+      <button
+        on:click={openCreateModal}
+        class="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-brand-600 to-brand-700 hover:from-brand-500 hover:to-brand-600 rounded-xl text-xs font-semibold shadow-lg shadow-brand-500/20 text-white transition-all"
+      >
+        <Plus class="w-4 h-4" />
+        Add Record
+      </button>
+    </div>
+  </div>
+
+  <!-- Search & Stats Bar -->
+  <div class="flex flex-col sm:flex-row gap-4 items-center justify-between bg-slate-900/30 p-4 border border-slate-900 rounded-xl">
+    <div class="relative w-full sm:w-80">
+      <Search class="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+      <input
+        type="text"
+        placeholder="Search all records..."
+        bind:value={search}
+        class="w-full pl-10 pr-4 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs focus:border-brand-500 focus:outline-none text-slate-300 transition-colors"
+      />
+    </div>
+    <div class="text-xs text-slate-500 font-medium flex items-center gap-2">
+      {{ '{#' }}if debouncedSearch}
+        <span class="px-2 py-0.5 rounded-md bg-brand-500/10 border border-brand-500/20 text-brand-400 text-[10px] font-semibold">
+          Server search
+        </span>
+      {/if}
+      Showing {displayedRecords.length} record{displayedRecords.length !== 1 ? 's' : ''} on this page
+    </div>
+  </div>
+
+  <!-- Main Grid/Table -->
+  {{ '{#' }}if error}
+    <SiriusError message={error} />
+  {:else}
+    <div class="flex flex-col gap-4">
+      <div class="relative">
+        <SiriusTable
+          schema={tableSchema}
+          records={displayedRecords}
+          {sortCol}
+          {sortDir}
+          {deleteConfirmId}
+          {highlightId}
+          {foreignKeyOptions}
+          {loading}
+          on:sort={handleSort}
+          on:edit={openEditModal}
+          on:delete={handleDelete}
+          on:set-delete-confirm-id={(e) => deleteConfirmId = e.detail}
+          on:add={openCreateModal}
+        />
+        {{ '{#' }}if loading && displayedRecords.length > 0}
+          <div class="absolute inset-0 bg-slate-950/40 backdrop-blur-[1px] rounded-2xl flex items-center justify-center transition-all duration-300">
+            <div class="flex items-center gap-3 px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-xl shadow-xl">
+              <Loader2 class="w-4 h-4 text-brand-500 animate-spin" />
+              <span class="text-xs text-slate-300 font-medium">Updating...</span>
+            </div>
+          </div>
+        {/if}
+      </div>
+      {{ '{#' }}if !loading && displayedRecords.length > 0}
+        <SiriusPagination
+          {page}
+          {hasNextPage}
+          on:prev-page={handlePrevPage}
+          on:next-page={handleNextPage}
+        />
+      {/if}
+    </div>
+  {/if}
+
+  <!-- Create / Edit Modal -->
+  {{ '{#' }}if isModalOpen}
+    <div class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
+      <div class="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
+        <header class="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+          <h3 class="font-outfit font-bold text-white text-base">
+            {editingRecord ? 'Update Record' : 'Create New Record'}
+          </h3>
+          <button
+            on:click={() => isModalOpen = false}
+            class="text-slate-400 hover:text-white p-1 hover:bg-slate-800 rounded-lg transition-all"
+          >
+            <X class="w-4 h-4" />
+          </button>
+        </header>
+
+        <form on:submit|preventDefault={handleSubmit} class="p-6 overflow-y-auto space-y-4 flex-1">
+          {% for col in columns %}
+          {% if not col.is_pk %}
+            <div class="flex flex-col gap-1.5 font-sans">
+              <label class="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-outfit">
+                {{ col.name.replace('_', ' ') }}
+              </label>
+
+              <!-- Relational dropdown -->
+              {% if col.foreign_key %}
+                {% set target_table = col.foreign_key.split('.')[0] %}
+                <SiriusDropdown
+                  name="{{ col.name }}"
+                  bind:value={formData.{{ col.name }}}
+                  options={ {{ target_table }}Options }
+                  error={ {{ target_table }}OptionsError }
+                  targetTable="{{ target_table }}"
+                  required={ {% if col.is_required %}true{% else %}false{% endif %} }
+                />
+
+              <!-- Boolean checkbox -->
+              {% elif col.type == 'Boolean' %}
+                <div class="flex items-center gap-3 py-2">
+                  <input
+                    type="checkbox"
+                    id="{{ col.name }}_field"
+                    name="{{ col.name }}"
+                    bind:checked={formData.{{ col.name }}}
+                    class="w-4.5 h-4.5 accent-brand-650 bg-slate-950 border border-slate-800 rounded focus:ring-0 focus:outline-none"
+                  />
+                  <label for="{{ col.name }}_field" class="text-xs text-slate-300">
+                    Enable
+                  </label>
+                </div>
+
+              <!-- Integer input -->
+              {% elif col.type == 'Integer' %}
+                <input
+                  type="number"
+                  step="1"
+                  {% if col.min_val is defined %}min="{{ col.min_val }}"{% endif %}
+                  {% if col.max_val is defined %}max="{{ col.max_val }}"{% endif %}
+                  name="{{ col.name }}"
+                  bind:value={formData.{{ col.name }}}
+                  {% if col.is_required %}required{% endif %}
+                  class="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs focus:border-brand-500 focus:outline-none text-slate-200 transition-colors"
+                />
+
+              <!-- Float input -->
+              {% elif col.type == 'Float' %}
+                <input
+                  type="number"
+                  step="any"
+                  {% if col.min_val is defined %}min="{{ col.min_val }}"{% endif %}
+                  {% if col.max_val is defined %}max="{{ col.max_val }}"{% endif %}
+                  name="{{ col.name }}"
+                  bind:value={formData.{{ col.name }}}
+                  {% if col.is_required %}required{% endif %}
+                  class="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs focus:border-brand-500 focus:outline-none text-slate-200 transition-colors"
+                />
+
+              <!-- DateTime input -->
+              {% elif col.type == 'DateTime' %}
+                <input
+                  type="datetime-local"
+                  name="{{ col.name }}"
+                  bind:value={formData.{{ col.name }}}
+                  {% if col.is_required %}required{% endif %}
+                  class="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs focus:border-brand-500 focus:outline-none text-slate-200 transition-colors"
+                />
+
+              <!-- Enum select select list -->
+              {% elif col.enum_values is defined and col.enum_values %}
+                <select
+                  name="{{ col.name }}"
+                  bind:value={formData.{{ col.name }}}
+                  {% if col.is_required %}required{% endif %}
+                  class="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs focus:border-brand-500 focus:outline-none text-slate-200 transition-colors"
+                >
+                  <option value="">Select {{ col.name.replace('_', ' ') }}...</option>
+                  {% for val in col.enum_values %}
+                    <option value="{{ val }}">{{ val }}</option>
+                  {% endfor %}
+                </select>
+
+              <!-- General string input with heuristics (email, phone, zip) -->
+              {% else %}
+                <input
+                  type="{% if 'email' in col.name %}email{% else %}text{% endif %}"
+                  name="{{ col.name }}"
+                  bind:value={formData.{{ col.name }}}
+                  {% if col.is_required %}required{% endif %}
+                  {% if col.pattern is defined and col.pattern %}pattern="{{ col.pattern }}"{% endif %}
+                  {% if col.placeholder is defined and col.placeholder %}placeholder="{{ col.placeholder }}"{% endif %}
+                  {% if col.placeholder is defined and col.placeholder %}title="Expected format: {{ col.placeholder }}"{% endif %}
+                  class="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs focus:border-brand-500 focus:outline-none text-slate-200 transition-colors"
+                />
+              {% endif %}
+            </div>
+          {% endif %}
+          {% endfor %}
+
+          <div class="pt-4 border-t border-slate-800 flex items-center justify-end gap-3 font-sans">
+            <button
+              type="button"
+              on:click={() => isModalOpen = false}
+              class="px-4 py-2 bg-slate-800 hover:bg-slate-750 text-slate-300 font-semibold text-xs rounded-xl transition-all"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              class="flex items-center gap-1.5 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white font-semibold text-xs rounded-xl disabled:opacity-50 transition-all shadow-lg shadow-brand-500/10"
+            >
+              {{ '{#' }}if submitting}
+                <Loader2 class="w-3.5 h-3.5 animate-spin" />
+              {/if}
+              Save
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  {/if}
+
+  <!-- Toast Notification -->
+  {{ '{#' }}if toast}
+    <SiriusToast
+      message={toast.message}
+      type={toast.type}
+      on:close={() => toast = null}
+    />
+  {/if}
+</div>

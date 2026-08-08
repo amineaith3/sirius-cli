@@ -2,10 +2,12 @@ from typing import Dict, Type
 from sirius_cli.frontends.base import FrontendStrategy
 from sirius_cli.frontends.react import ReactFrontendStrategy
 from sirius_cli.frontends.vue import VueFrontendStrategy
+from sirius_cli.frontends.svelte import SvelteFrontendStrategy
 
 FRONTEND_STRATEGIES: Dict[str, Type[FrontendStrategy]] = {
     "react": ReactFrontendStrategy,
     "vue": VueFrontendStrategy,
+    "svelte": SvelteFrontendStrategy,
 }
 
 

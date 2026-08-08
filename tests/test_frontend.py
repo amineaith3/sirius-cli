@@ -8,6 +8,7 @@ from typer.testing import CliRunner
 from sirius_cli.cli import app
 from sirius_cli.frontends import get_frontend_strategy
 from sirius_cli.frontends.react import ReactFrontendStrategy
+from sirius_cli.frontends.svelte import SvelteFrontendStrategy
 
 runner = CliRunner()
 
@@ -117,12 +118,61 @@ def test_invalid_frontend_strategy_rejected(tmp_project_dir, base_config_json):
             "--config",
             base_config_json,
             "--frontend",
-            "svelte",
+            "angular",
             "--no-seed",
         ],
     )
     assert result.exit_code != 0
-    assert "Error: Unsupported frontend 'svelte'" in result.output
+    assert "Error: Unsupported frontend 'angular'" in result.output
+
+
+def test_svelte_frontend_files_generated(tmp_project_dir, base_config_json):
+    """--frontend=svelte must scaffold all required frontend source files, including components and routes."""
+    project_path = os.path.join(tmp_project_dir, "svelte_app")
+    result = runner.invoke(
+        app,
+        [
+            "init",
+            project_path,
+            "--config",
+            base_config_json,
+            "--frontend",
+            "svelte",
+            "--no-seed",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+
+    frontend_dir = os.path.join(project_path, "frontend")
+    expected_files = [
+        "package.json",
+        "tsconfig.json",
+        "svelte.config.js",
+        "vite.config.ts",
+        "tailwind.config.js",
+        "postcss.config.js",
+        "Dockerfile",
+        ".env",
+        "src/app.html",
+        "src/app.d.ts",
+        "src/index.css",
+        "src/routes/+layout.svelte",
+        "src/routes/+layout.ts",
+        "src/routes/+page.svelte",
+        "src/routes/api/health/+server.ts",
+        "src/lib/stores/auth.ts",
+        "src/lib/components/SiriusTable.svelte",
+        "src/lib/components/SiriusPagination.svelte",
+        "src/lib/components/SiriusBadge.svelte",
+        "src/lib/components/SiriusDropdown.svelte",
+        "src/lib/components/SiriusError.svelte",
+        "src/lib/components/SiriusToast.svelte",
+        "src/routes/tasks/+page.svelte",
+    ]
+
+    for expected_file in expected_files:
+        path = os.path.join(frontend_dir, expected_file)
+        assert os.path.exists(path), f"Expected {expected_file} to exist in frontend/"
 
 
 def test_vue_frontend_files_generated(tmp_project_dir, base_config_json):
@@ -182,6 +232,10 @@ def test_frontend_strategy_registry():
     strategy_vue = get_frontend_strategy("vue")
     assert isinstance(strategy_vue, VueFrontendStrategy)
     assert strategy_vue.name == "vue"
+
+    strategy_svelte = get_frontend_strategy("svelte")
+    assert isinstance(strategy_svelte, SvelteFrontendStrategy)
+    assert strategy_svelte.name == "svelte"
 
     with pytest.raises(ValueError) as exc:
         get_frontend_strategy("angular")
