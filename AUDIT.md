@@ -1,4 +1,4 @@
-# Sirius-CLI — Full Audit (v0.5.2)
+# Sirius-CLI — Full Audit (v0.5.3)
 
 ## What It Is
 
@@ -105,6 +105,7 @@ The `update` command regenerates backend and frontend for new tables/columns add
 | Django Backend Support (`--backend=django`)                         | Added in v0.4.4                                     |
 | Pluggable Frontend Strategies (`--frontend`)                        | Added in v0.5.1                                     |
 | Vue 3 Support (`--frontend=vue`)                                    | Added in v0.5.2                                     |
+| SvelteKit Support (`--frontend=svelte`)                              | Added in v0.5.3                                     |
 
 ---
 
@@ -131,7 +132,7 @@ Prioritized by value-to-effort ratio:
 | # | Feature                                               | Why                                                                                  |
 | - | ----------------------------------------------------- | ------------------------------------------------------------------------------------ |
 | 5 | **`--backend=flask\|django\|fastapi` selector** | ~~Unlocks the Django and Flask developer markets.~~ **Flask done in v0.4.2. Django done in v0.4.4.**   |
-| 6 | **`--frontend=react\|vue\|svelte` selector**    | Combined with backend selectors = 9 unique stack combinations from a single command. |
+| 6 | **`--frontend=react\|vue\|svelte` selector**    | ~~Combined with backend selectors = 9 unique stack combinations from a single command.~~ **Vue done in v0.5.2. Svelte done in v0.5.3.** |
 | 7 | **`--from-url` flag**                         | ~~Accept a public CSV URL and fetch + parse on the fly.~~ **Done in v0.3.4**  |
 
 ---

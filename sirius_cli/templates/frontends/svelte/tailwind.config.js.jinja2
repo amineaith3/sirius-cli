@@ -1,0 +1,20 @@
+import colors from 'tailwindcss/colors'
+
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./src/**/*.{html,js,svelte,ts}",
+  ],
+  theme: {
+    extend: {
+      colors: {
+        brand: colors.{{ theme | default('blue') }}
+      },
+      fontFamily: {
+        sans: ['Inter', 'sans-serif'],
+        outfit: ['Outfit', 'sans-serif']
+      }
+    }
+  },
+  plugins: []
+}

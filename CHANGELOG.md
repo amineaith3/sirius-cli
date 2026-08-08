@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [0.5.3] — 2026-08-08
+
+### Added
+- Implemented `SvelteFrontendStrategy` in `sirius_cli/frontends/svelte.py` and registered it, enabling SvelteKit frontend scaffolding via `--frontend=svelte`.
+- Added 22 new SvelteKit templates under `sirius_cli/templates/frontends/svelte/` covering project configurations (`package.json`, `svelte.config.js`, `vite.config.ts`, `tsconfig.json`, `tailwind.config.js`, `postcss.config.js`, `Dockerfile`, `.env`), layouts, ambient types (`src/app.d.ts`), style sheets (`src/index.css`), routing (`src/routes/+layout.svelte`, `src/routes/+layout.ts`, `src/routes/+page.svelte`, `src/routes/api/health/+server.ts`, `src/routes/login/+page.svelte`, components, store, and dynamic CRUD entity page templates).
+- Custom responsive SVG bar charts in `+page.svelte` dashboard demonstrating trend and fallback counts with interactive tooltip positions.
+- Full parity with React/Vue 3 on pagination, sort, search query parameter URL state binds, form validations, relation selects, and file exports.
+- Svelte writable store tracking user session token inside `src/lib/stores/auth.ts`.
+- Automated Svelte frontend strategy test and validation registration in `tests/test_frontend.py` with passing dual-environment verification.
+
 ## [0.5.2] — 2026-08-04
 
 ### Added
