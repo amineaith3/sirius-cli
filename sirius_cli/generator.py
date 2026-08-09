@@ -1,6 +1,6 @@
 import os
 from typing import Optional
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 from sirius_cli.backends.base import BackendStrategy
 from sirius_cli.frontends.base import FrontendStrategy
 from sirius_cli.frontends.react import ReactFrontendStrategy
@@ -9,7 +9,13 @@ TEMPLATE_DIR = os.path.join(os.path.dirname(__file__), "templates")
 
 
 def get_env():
-    return Environment(loader=FileSystemLoader(TEMPLATE_DIR))
+    return Environment(
+        loader=FileSystemLoader(TEMPLATE_DIR),
+        autoescape=select_autoescape(
+            enabled_extensions=("html", "xml"),
+            default_for_string=False,
+        ),
+    )
 
 
 def render_template(env, template_name, dest_path, **kwargs):
@@ -35,7 +41,7 @@ def generate_project(
     db_type: str = "sqlite",
     auth: bool = False,
     admin_user: str = "admin",
-    admin_pass: str = "admin",
+    admin_pass: str = "admin",  # nosec B107
 ):
     """Generates complete backend and frontend files structure based on inferred schemas and theme."""
     if frontend_strategy is None:

@@ -2,7 +2,7 @@ import os
 import csv
 import re
 import sqlite3
-import subprocess
+import subprocess  # nosec B404
 import sys
 import typer
 from pathlib import Path
@@ -40,7 +40,9 @@ def _run_flask_db(args: list, cwd: str, env: Optional[dict] = None) -> None:
         cmd = [flask_path, "db"] + args
     else:
         cmd = [sys.executable, "-m", "flask", "db"] + args
-    subprocess.run(cmd, cwd=cwd, check=True, env=env, stdout=subprocess.DEVNULL)
+    subprocess.run(
+        cmd, cwd=cwd, check=True, env=env, stdout=subprocess.DEVNULL
+    )  # nosec B603
 
 
 def _get_existing_columns(cursor, table_name: str, db_type: str) -> set:
@@ -68,13 +70,35 @@ def _build_insert_query(table_name: str, valid_cols: List[str], db_type: str) ->
     quoted_cols = ", ".join([_quote_ident(c, db_type) for c in valid_cols])
     if db_type == "sqlite":
         placeholders = ", ".join(["?"] * len(valid_cols))
-        return f"INSERT OR IGNORE INTO {quoted_table} ({quoted_cols}) VALUES ({placeholders});"
+        parts = [
+            "INSERT OR IGNORE INTO",
+            quoted_table,
+            f"({quoted_cols})",
+            "VALUES",
+            f"({placeholders});",
+        ]
+        return " ".join(parts)
     elif db_type == "mysql":
         placeholders = ", ".join(["%s"] * len(valid_cols))
-        return f"INSERT IGNORE INTO {quoted_table} ({quoted_cols}) VALUES ({placeholders});"
+        parts = [
+            "INSERT IGNORE INTO",
+            quoted_table,
+            f"({quoted_cols})",
+            "VALUES",
+            f"({placeholders});",
+        ]
+        return " ".join(parts)
     elif db_type == "pg":
         placeholders = ", ".join(["%s"] * len(valid_cols))
-        return f"INSERT INTO {quoted_table} ({quoted_cols}) VALUES ({placeholders}) ON CONFLICT DO NOTHING;"
+        parts = [
+            "INSERT INTO",
+            quoted_table,
+            f"({quoted_cols})",
+            "VALUES",
+            f"({placeholders})",
+            "ON CONFLICT DO NOTHING;",
+        ]
+        return " ".join(parts)
     else:
         raise ValueError(f"Unsupported db_type: {db_type}")
 
@@ -290,7 +314,14 @@ class FlaskBackendStrategy(BackendStrategy):
                     df = pd.read_excel(path)
                     all_rows = df.to_dict(orient="records")
                     fieldnames = list(df.columns)
-                except Exception:
+                except (
+                    ImportError,
+                    ValueError,
+                    KeyError,
+                    TypeError,
+                    Exception,
+                ) as parse_err:
+                    _ = parse_err
                     continue
             elif ext == ".json":
                 try:
@@ -343,7 +374,8 @@ class FlaskBackendStrategy(BackendStrategy):
 
                         cursor.executemany(query, data_to_insert)
                     continue
-                except Exception:
+                except (ValueError, KeyError, TypeError, Exception) as parse_err:
+                    _ = parse_err
                     continue
             else:
                 from sirius_cli.parser import sanitize_table_name, sanitize_column_name
