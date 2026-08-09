@@ -34,9 +34,14 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
 ]
+
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = "DENY"
 
 ROOT_URLCONF = "backend.urls"
 
@@ -115,8 +120,9 @@ SIMPLE_JWT = {
 }
 {% endif %}
 
-# CORS — allow the Vite dev server and the configured API URL
-CORS_ALLOWED_ORIGINS = [
+# CORS — configurable via ALLOWED_ORIGINS env variable or fallback to dev origins
+_env_origins = os.environ.get("ALLOWED_ORIGINS")
+CORS_ALLOWED_ORIGINS = [o.strip() for o in _env_origins.split(",")] if _env_origins else [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "{{ api_url }}",
