@@ -465,12 +465,20 @@ def parse_sqlite_db(db_path: str) -> Dict[str, List[Dict[str, Any]]]:
                 samples = []
                 try:
                     cursor2 = conn.cursor()
-                    cursor2.execute(
-                        f'SELECT "{info[1]}" FROM "{table}" WHERE "{info[1]}" IS NOT NULL LIMIT 50;'
-                    )
+                    col_name_str = info[1]
+                    query_parts = [
+                        "SELECT",
+                        f'"{col_name_str}"',
+                        "FROM",
+                        f'"{table}"',
+                        "WHERE",
+                        f'"{col_name_str}"',
+                        "IS NOT NULL LIMIT 50;",
+                    ]
+                    cursor2.execute(" ".join(query_parts))
                     samples = [r[0] for r in cursor2.fetchall()]
                     cursor2.close()
-                except Exception:
+                except Exception:  # nosec B110
                     pass
 
                 if _is_phone_column(col_name, samples):

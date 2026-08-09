@@ -1,3 +1,4 @@
+import os
 import io
 import json
 import base64
@@ -25,17 +26,27 @@ def create_app() -> Flask:
     init_auth(flask_app)
 {% endif %}
 
-    # CORS — restrict to the frontend dev server and the configured API URL.
-    # ⚠ Add your production domain here when deploying.
+    # CORS — configurable via ALLOWED_ORIGINS env variable or fallback to dev origins
+    _env_origins = os.environ.get("ALLOWED_ORIGINS")
+    _allowed_origins = [o.strip() for o in _env_origins.split(",")] if _env_origins else [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "{{ api_url }}",
+    ]
+
     CORS(
         flask_app,
-        resources={r"/api/*": {"origins": [
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
-            "{{ api_url }}",
-        ]}},
+        resources={r"/api/*": {"origins": _allowed_origins}},
         supports_credentials=True,
     )
+
+    # Security Response Headers Middleware
+    @flask_app.after_request
+    def add_security_headers(response):
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        return response
 
     # Register blueprints
 {% if auth %}

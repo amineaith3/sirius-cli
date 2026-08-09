@@ -272,8 +272,8 @@ def init(
         typer.secho(f"Error parsing schemas: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1)
 
-    assert project_name is not None
-    assert admin_pass is not None
+    if project_name is None or admin_pass is None:
+        raise typer.BadParameter("Project name and admin password must not be None.")
 
     dest_dir = os.path.abspath(os.path.join(out, project_name))
     typer.echo(
@@ -544,7 +544,8 @@ def update(
     project_name = os.path.basename(os.path.abspath(project_path))
 
     typer.echo(f"Updating project in: {project_path}")
-    assert admin_pass is not None
+    if admin_pass is None:
+        raise typer.BadParameter("Admin password must not be None.")
     try:
         generate_project(
             project_path,

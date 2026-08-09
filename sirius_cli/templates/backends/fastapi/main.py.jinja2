@@ -1,3 +1,4 @@
+import os
 import io
 import json
 import base64
@@ -20,9 +21,9 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Proto-CLI Generated Backend API", version="0.1.0")
 
-# CORS: Restrict origins to the frontend dev server and the configured API URL.
-# ⚠ Add your production domain here when deploying.
-_allowed_origins = [
+# CORS: Configurable via ALLOWED_ORIGINS env variable or fallback to dev origins
+_env_origins = os.environ.get("ALLOWED_ORIGINS")
+_allowed_origins = [o.strip() for o in _env_origins.split(",")] if _env_origins else [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "{{ api_url }}",
@@ -35,6 +36,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Security Response Headers Middleware
+@app.middleware("http")
+async def add_security_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    return response
 
 {% if auth %}
 # Seed initial admin user if table is empty
