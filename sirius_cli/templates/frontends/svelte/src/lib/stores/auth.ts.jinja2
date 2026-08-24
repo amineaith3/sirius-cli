@@ -1,0 +1,17 @@
+{% raw %}
+import { writable } from 'svelte/store';
+import { browser } from '$app/environment';
+
+const initialToken = browser ? localStorage.getItem('token') : null;
+export const token = writable<string | null>(initialToken);
+
+export function login(newToken: string) {
+  if (browser) localStorage.setItem('token', newToken);
+  token.set(newToken);
+}
+
+export function logout() {
+  if (browser) localStorage.removeItem('token');
+  token.set(null);
+}
+{% endraw %}

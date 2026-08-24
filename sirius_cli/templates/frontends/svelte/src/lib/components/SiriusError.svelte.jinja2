@@ -1,0 +1,14 @@
+{% raw %}
+<script lang="ts">
+  import { AlertCircle } from 'lucide-svelte';
+  export let message: string;
+</script>
+
+<div class="p-6 border border-red-500/20 bg-red-500/5 text-red-400 rounded-2xl flex items-start gap-3">
+  <AlertCircle class="w-5 h-5 flex-shrink-0 mt-0.5" />
+  <div>
+    <h4 class="text-sm font-bold font-outfit text-red-400">System Error</h4>
+    <p class="text-xs mt-1 text-red-400/80">{message}</p>
+  </div>
+</div>
+{% endraw %}
