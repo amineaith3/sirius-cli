@@ -1,0 +1,11 @@
+{% raw %}
+<script lang="ts">
+  export let value: any;
+</script>
+
+<span
+  class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold font-sans tracking-wide uppercase {value ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'}"
+>
+  {value ? 'True' : 'False'}
+</span>
+{% endraw %}

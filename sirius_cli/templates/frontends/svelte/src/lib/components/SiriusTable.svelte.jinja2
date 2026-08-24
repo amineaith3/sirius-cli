@@ -1,0 +1,207 @@
+{% raw %}
+<script lang="ts">
+  import { ArrowUpDown, ArrowUp, ArrowDown, Edit2, Trash2 } from 'lucide-svelte';
+  import { createEventDispatcher } from 'svelte';
+  import { goto } from '$app/navigation';
+  import SiriusBadge from './SiriusBadge.svelte';
+
+  export interface ColumnSchema {
+    name: string
+    type: string
+    foreignKey: string | null
+    isPk: boolean
+    isRequired: boolean
+    enumValues?: string[]
+    pattern?: string
+    placeholder?: string
+  }
+
+  export let schema: ColumnSchema[] = [];
+  export let records: any[] = [];
+  export let sortCol: string | null = null;
+  export let sortDir: 'asc' | 'desc' = 'asc';
+  export let deleteConfirmId: number | null = null;
+  export let highlightId: number | null = null;
+  export let foreignKeyOptions: Record<string, any[]> = {};
+  export let loading: boolean = false;
+  export let onAdd: (() => void) | null = null;
+
+  const dispatch = createEventDispatcher();
+  let rowElements: Record<number, HTMLElement> = {};
+
+  $: if (highlightId && rowElements[highlightId]) {
+    setTimeout(() => {
+      const el = rowElements[highlightId!];
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 50);
+  }
+
+  // Also trigger when records change
+  $: if (records && highlightId && rowElements[highlightId]) {
+    setTimeout(() => {
+      const el = rowElements[highlightId!];
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }, 50);
+  }
+
+  const getForeignKeyDisplay = (col: ColumnSchema, val: any) => {
+    if (val === null || val === undefined) return '-';
+    const targetTable = col.foreignKey!.split('.')[0];
+    const options = foreignKeyOptions[targetTable] || [];
+    const opt = options.find((o: any) => o.id === val);
+    if (opt) {
+      return opt.name || opt.username || opt.email || opt.title || opt.label || `${targetTable} #${opt.id}`;
+    }
+    return `${targetTable} #${val}`;
+  };
+
+  const navigateToParent = (col: ColumnSchema, val: any) => {
+    if (val === null || val === undefined) return;
+    const targetTable = col.foreignKey!.split('.')[0];
+    goto(`/${targetTable}?highlight=${val}`);
+  };
+</script>
+
+<div class="bg-slate-900/20 border border-slate-900 rounded-2xl overflow-hidden">
+  <div class="overflow-x-auto max-w-full">
+    <table class="w-full min-w-max text-left border-collapse">
+      <thead>
+        <tr class="border-b border-slate-900 bg-slate-900/50">
+          {#each schema as col (col.name)}
+            <th
+              on:click={() => dispatch('sort', col.name)}
+              class="px-6 py-4 text-xs font-bold text-slate-400 uppercase font-outfit tracking-wider cursor-pointer hover:text-slate-200 select-none transition-colors whitespace-nowrap"
+            >
+              <div class="flex items-center gap-1.5">
+                {col.name.replace('_', ' ')}
+                {#if sortCol !== col.name}
+                  <ArrowUpDown class="w-3 h-3 text-slate-600" />
+                {:else}
+                  {#if sortDir === 'asc'}
+                    <ArrowUp class="w-3 h-3 text-brand-400" />
+                  {:else}
+                    <ArrowDown class="w-3 h-3 text-brand-400" />
+                  {/if}
+                {/if}
+              </div>
+            </th>
+          {/each}
+          <th class="px-6 py-4 text-xs font-bold text-slate-400 uppercase font-outfit tracking-wider text-right whitespace-nowrap sticky right-0 bg-slate-950/90 backdrop-blur z-10">
+            Actions
+          </th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-900">
+        {#if loading && records.length === 0}
+          {#each Array(5) as _, rowIndex}
+            <tr class="border-b border-slate-900 bg-slate-900/10">
+              {#each schema as col}
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <div class="h-3.5 bg-slate-800 rounded animate-pulse w-2/3"></div>
+                </td>
+              {/each}
+              <td class="px-6 py-4 text-right whitespace-nowrap sticky right-0 bg-slate-950/90 backdrop-blur z-10">
+                <div class="flex justify-end gap-2">
+                  <div class="w-7 h-7 bg-slate-800 rounded-lg animate-pulse"></div>
+                  <div class="w-7 h-7 bg-slate-800 rounded-lg animate-pulse"></div>
+                </div>
+              </td>
+            </tr>
+          {/each}
+        {:else if records.length === 0}
+          <tr>
+            <td colspan={schema.length + 1} class="px-6 py-16 text-center">
+              <div class="flex flex-col items-center justify-center gap-3">
+                <div class="p-3.5 rounded-full bg-slate-900 border border-slate-800 text-slate-400">
+                  <svg class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-3m-9 0H3m2 2h14" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 class="text-sm font-bold font-outfit text-slate-200">No records found</h3>
+                  <p class="text-xs text-slate-500 mt-1 max-w-xs mx-auto">
+                    Get started by creating a new record in this table.
+                  </p>
+                </div>
+                {#if onAdd}
+                  <button
+                    on:click={() => dispatch('add')}
+                    class="mt-2 px-4 py-2 bg-slate-900 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-xs font-semibold text-slate-300 rounded-xl transition-all cursor-pointer"
+                  >
+                    Add Record
+                  </button>
+                {/if}
+              </div>
+            </td>
+          </tr>
+        {:else}
+          {#each records as record (record.id)}
+            <tr
+              bind:this={rowElements[record.id]}
+              class="transition-colors {highlightId === record.id ? 'bg-brand-500/10 ring-1 ring-inset ring-brand-500/40 animate-pulse' : 'hover:bg-slate-900/30'}"
+            >
+              {#each schema as col}
+                <td class="px-6 py-4 text-xs font-medium text-slate-300 font-mono whitespace-nowrap">
+                  {#if col.type === 'Boolean'}
+                    <SiriusBadge value={record[col.name]} />
+                  {:else if col.type === 'DateTime'}
+                    {record[col.name] ? new Date(record[col.name]).toLocaleString() : '-'}
+                  {:else if col.foreignKey}
+                    <button
+                      on:click={() => record[col.name] !== null && navigateToParent(col, record[col.name])}
+                      class="px-2 py-0.5 rounded bg-slate-800/80 text-brand-400 border border-slate-700/40 text-[10px] font-bold cursor-pointer hover:bg-slate-700/60 hover:border-brand-500/30 transition-all"
+                      title="Go to {col.foreignKey.split('.')[0]} record"
+                    >
+                      {getForeignKeyDisplay(col, record[col.name])}
+                    </button>
+                  {:else}
+                    {record[col.name] !== null && record[col.name] !== undefined ? String(record[col.name]) : '-'}
+                  {/if}
+                </td>
+              {/each}
+
+              <td class="px-6 py-4 text-right whitespace-nowrap sticky right-0 bg-slate-950/90 backdrop-blur z-10">
+                <div class="flex items-center justify-end gap-2">
+                  <button
+                    on:click={() => dispatch('edit', record)}
+                    class="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg transition-all"
+                  >
+                    <Edit2 class="w-3.5 h-3.5" />
+                  </button>
+                  {#if deleteConfirmId === record.id}
+                    <div class="flex items-center gap-1.5">
+                      <button
+                        on:click={() => dispatch('delete', record.id)}
+                        class="px-2 py-1 bg-red-600 hover:bg-red-500 text-[10px] text-white font-bold rounded-md"
+                      >
+                        Confirm
+                      </button>
+                      <button
+                        on:click={() => dispatch('set-delete-confirm-id', null)}
+                        class="px-2 py-1 bg-slate-800 hover:bg-slate-750 text-[10px] text-slate-300 rounded-md"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  {:else}
+                    <button
+                      on:click={() => dispatch('set-delete-confirm-id', record.id)}
+                      class="p-1.5 hover:bg-red-950/40 text-slate-400 hover:text-red-400 rounded-lg transition-all"
+                    >
+                      <Trash2 class="w-3.5 h-3.5" />
+                    </button>
+                  {/if}
+                </div>
+              </td>
+            </tr>
+          {/each}
+        {/if}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endraw %}

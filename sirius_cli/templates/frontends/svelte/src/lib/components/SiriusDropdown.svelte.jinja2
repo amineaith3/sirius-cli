@@ -1,0 +1,28 @@
+{% raw %}
+<script lang="ts">
+  export let name: string;
+  export let value: string | number | null | undefined = "";
+  export let options: any[] = [];
+  export let error: string | null = null;
+  export let targetTable: string;
+  export let required: boolean = false;
+</script>
+
+<select
+  {name}
+  bind:value={value}
+  {required}
+  class="px-3 py-2 bg-slate-950 border border-slate-800 rounded-xl text-xs focus:border-brand-500 focus:outline-none text-slate-200 transition-colors w-full"
+>
+  <option value="">Select {targetTable.replace('_', ' ')}</option>
+  {#if error}
+    <option disabled>Failed to load options</option>
+  {#else}
+    {#each options as opt (opt.id)}
+      <option value={opt.id}>
+        {opt.name || opt.username || opt.email || opt.title || opt.label || `ID: ${opt.id}`}
+      </option>
+    {/each}
+  {/if}
+</select>
+{% endraw %}
