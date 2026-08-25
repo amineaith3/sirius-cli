@@ -398,7 +398,7 @@ const hideTooltip = () => {
 
       <div v-else-if="error" class="p-6 border border-red-500/20 bg-red-500/5 text-red-400 rounded-2xl">
         <p class="font-semibold text-sm">Failed to connect to backend server</p>
-        <p class="text-xs mt-1 text-red-400/80">Make sure the FastAPI backend is running on {{ API_BASE }}.</p>
+        <p class="text-xs mt-1 text-red-400/80">Make sure the {{ backend_label }} backend is running on {{ '{{ API_BASE }}' }}.</p>
       </div>
 
       <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-6">

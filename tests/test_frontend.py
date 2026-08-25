@@ -240,3 +240,77 @@ def test_frontend_strategy_registry():
     with pytest.raises(ValueError) as exc:
         get_frontend_strategy("angular")
     assert "Unsupported frontend engine: 'angular'" in str(exc.value)
+
+
+def test_dynamic_footer_labels_rendering(tmp_project_dir, base_config_json):
+    """Verify that backend and frontend dynamic labels render accurately across frameworks."""
+    # Test Flask + React
+    flask_react_path = os.path.join(tmp_project_dir, "flask_react_app")
+    result = runner.invoke(
+        app,
+        [
+            "init",
+            flask_react_path,
+            "--config",
+            base_config_json,
+            "--backend",
+            "flask",
+            "--frontend",
+            "react",
+            "--no-seed",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    app_tsx = os.path.join(flask_react_path, "frontend", "src", "App.tsx")
+    assert os.path.exists(app_tsx)
+    with open(app_tsx, "r", encoding="utf-8") as f:
+        content = f.read()
+        assert "Flask + React SPA" in content
+
+    # Test Django + Vue
+    django_vue_path = os.path.join(tmp_project_dir, "django_vue_app")
+    result_vue = runner.invoke(
+        app,
+        [
+            "init",
+            django_vue_path,
+            "--config",
+            base_config_json,
+            "--backend",
+            "django",
+            "--frontend",
+            "vue",
+            "--no-seed",
+        ],
+    )
+    assert result_vue.exit_code == 0, result_vue.output
+    app_vue = os.path.join(django_vue_path, "frontend", "src", "App.vue")
+    assert os.path.exists(app_vue)
+    with open(app_vue, "r", encoding="utf-8") as f:
+        content_vue = f.read()
+        assert "Django + Vue SPA" in content_vue
+
+    # Test FastAPI + SvelteKit
+    fastapi_svelte_path = os.path.join(tmp_project_dir, "fastapi_svelte_app")
+    result_svelte = runner.invoke(
+        app,
+        [
+            "init",
+            fastapi_svelte_path,
+            "--config",
+            base_config_json,
+            "--backend",
+            "fastapi",
+            "--frontend",
+            "svelte",
+            "--no-seed",
+        ],
+    )
+    assert result_svelte.exit_code == 0, result_svelte.output
+    layout_svelte = os.path.join(
+        fastapi_svelte_path, "frontend", "src", "routes", "+layout.svelte"
+    )
+    assert os.path.exists(layout_svelte)
+    with open(layout_svelte, "r", encoding="utf-8") as f:
+        content_svelte = f.read()
+        assert "FastAPI + SvelteKit" in content_svelte
