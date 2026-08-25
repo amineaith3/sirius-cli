@@ -1,14 +1,14 @@
-{% raw %}
 <script setup lang="ts">
 withDefaults(defineProps<{
   title?: string
   message?: string
 }>(), {
   title: 'Failed to connect to backend server',
-  message: 'Make sure your FastAPI server is running.'
+  message: 'Make sure your {{ backend_label }} server is running.'
 })
 </script>
 
+{% raw %}
 <template>
   <div class="p-6 border border-red-500/20 bg-red-500/5 text-red-400 rounded-2xl text-center">
     <p class="font-semibold text-sm">{{ title }}</p>

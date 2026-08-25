@@ -47,6 +47,12 @@ def generate_project(
     if frontend_strategy is None:
         frontend_strategy = ReactFrontendStrategy()
     env = get_env()
+    backend_labels = {"fastapi": "FastAPI", "flask": "Flask", "django": "Django"}
+    frontend_labels = {"react": "React SPA", "vue": "Vue SPA", "svelte": "SvelteKit"}
+    backend_name = getattr(backend_strategy, "name", "fastapi")
+    frontend_name = getattr(frontend_strategy, "name", "react")
+    backend_label = backend_labels.get(backend_name, backend_name.capitalize())
+    frontend_label = frontend_labels.get(frontend_name, frontend_name.capitalize())
 
     # Shared template context — all templates receive all variables
     ctx = dict(
@@ -59,6 +65,10 @@ def generate_project(
         auth=auth,
         admin_user=admin_user,
         admin_pass=admin_pass,
+        backend_name=backend_name,
+        frontend_name=frontend_name,
+        backend_label=backend_label,
+        frontend_label=frontend_label,
     )
 
     # 1. Root docker-compose configuration
